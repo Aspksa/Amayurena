@@ -445,12 +445,22 @@
     label.addEventListener("click",()=>{
       if (basesState.busy) return;
       td.replaceChildren();
-      const input=mk("input","knowledge-bases-input");
-      input.type=type==="number"?"number":type==="date"?"date":type==="checkbox"?"checkbox":"text";
-      if (type==="number") input.step="any";
-      if (type==="checkbox") input.checked=value.toLowerCase()==="true";
-      else input.value=value;
-      if (type==="tags") input.placeholder="метка1, метка2";
+      const input=mk(type==="select"?"select":"input","knowledge-bases-input");
+      if (type==="select") {
+        const options=[...new Set([value,...config.rows.map(r=>cellValue(r,key))].filter(Boolean))].slice(0,100);
+        const blank=mk("option","","Выберите…");blank.value="";input.append(blank);
+        for (const item of options) {
+          const opt=mk("option","",item);opt.value=item;input.append(opt);
+        }
+        const custom=mk("option","","＋ Другое значение");custom.value="__new_choice__";input.append(custom);
+        input.value=value;
+      } else {
+        input.type=type==="number"?"number":type==="date"?"date":type==="checkbox"?"checkbox":"text";
+        if (type==="number") input.step="any";
+        if (type==="checkbox") input.checked=value.toLowerCase()==="true";
+        else input.value=value;
+        if (type==="tags") input.placeholder="метка1, метка2";
+      }
       const commit=()=>{
         try {
           const v=editorValue(type,type==="checkbox"?input.checked:input.value);
@@ -462,6 +472,13 @@
         if (e.key==="Enter") { e.preventDefault(); commit(); }
       });
       if (type==="checkbox") input.addEventListener("change",commit);
+      if (type==="select") input.addEventListener("change",()=>{
+        if (input.value==="__new_choice__") {
+          const other=prompt("Новое значение поля «"+key+"»:");
+          if (other===null) { renderBases(); return; }
+          void writeProperty(row,key,type,other.trim(),input);
+        } else commit();
+      });
       const ok=mk("button","knowledge-bases-commit","✓");
       ok.type="button";ok.title="Сохранить";ok.addEventListener("click",commit);
       const cancel=mk("button","knowledge-bases-cancel","×");
