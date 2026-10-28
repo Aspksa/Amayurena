@@ -60,3 +60,15 @@ test("image asset paths are constrained and imports require supported formats", 
   await assert.rejects(() => window.AmayurenaAvatarAssetsApi.importImage(
     { type: "text/html", size: 40 }, 0), /PNG/);
 });
+
+test("built-in AVIF sprite contains eight unique poses including all ten selectable slots", () => {
+  const image = fs.readFileSync(path.join(__dirname, "..", "assets", "avatars", "sprite.avif"));
+  assert.equal(image.length, 19154);
+  assert.equal(image.toString("ascii", 4, 12), "ftypavif");
+  const window = {};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "avatar-assets.js"), "utf8"), {
+    window, localStorage: { getItem: () => null }
+  });
+  assert.equal(window.AmayurenaAvatarAssetsApi.spriteUrl, "./assets/avatars/sprite.avif");
+  assert.equal(window.AmayurenaAvatarAssets.length, 10);
+});
