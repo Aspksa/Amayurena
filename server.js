@@ -18,6 +18,7 @@ const STATIC_FILES = Object.freeze({
   "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
   "/knowledge.css": ["knowledge.css", "text/css; charset=utf-8"],
   "/knowledge.js": ["knowledge.js", "text/javascript; charset=utf-8"],
+  "/knowledge-native.js": ["knowledge-native.js", "text/javascript; charset=utf-8"],
   "/knowledge-advanced.js": ["knowledge-advanced.js", "text/javascript; charset=utf-8"],
   "/knowledge-markdown.js": ["knowledge-markdown.js", "text/javascript; charset=utf-8"],
   "/knowledge-advanced.css": ["knowledge-advanced.css", "text/css; charset=utf-8"],
@@ -155,6 +156,13 @@ function createServer(options = {}) {
         const body = await readJson(req);
         return json(res, 200, knowledgeAdvanced.saveCanvas(canvasRoot, body && body.name, body && body.board));
       } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка Canvas." }); }
+    }
+    if (pathname === "/api/knowledge/note/create" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON-запрос." });
+        const body = await readJson(req);
+        return json(res, 201, knowledge.create(knowledgeRoot, body && body.path, body && body.content));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось создать заметку." }); }
     }
     if (pathname === "/api/knowledge/note" && ["GET", "POST", "DELETE"].includes(req.method)) {
       try {
