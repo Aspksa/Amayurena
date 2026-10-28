@@ -265,7 +265,7 @@
       initialized = true;
       window.AmayurenaKnowledgeAdvanced.init({
         onNoteOpen: openNote,
-        beforeRestore: saveNow,
+        beforeRestore: async () => { await saveNow(); if (active && revision > committed) throw new Error("Текущие изменения не сохранены."); },
         onReload: path => openNote(path, true)
       });
       ui.editor.addEventListener("input", scheduleSave);
