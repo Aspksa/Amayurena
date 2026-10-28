@@ -96,6 +96,60 @@ function trashRestore(spec, id) {
 function ensureVacant(folder) {
   if (fs.existsSync(folder)) throw fail("Такое имя уже существует.", 409);
 }
+
+function rebaseHistory(spec, mapping) {
+  for (const [oldPath, newPath] of mapping) {
+    const oldDir = path.join(spec.historyRoot, sha(oldPath));
+    if (!fs.existsSync(oldDir)) continue;
+    const newDir = path.join(spec.historyRoot, sha(newPath));
+    ensureVacant(newDir);
+    for (const name of fs.readdirSync(oldDir)) {
+      if (!/^[0-9]{13}-[a-f0-9]{12}\.json$/.test(name)) throw fail("Неподдерживаемый файл истории.");
+      const filename = path.join(oldDir, name);
+      safeFile(filename);
+      const value = JSON.parse(fs.readFileSync(filename, "utf8"));
+      if (value.path !== oldPath) throw fail("История не соответствует заметке.");
+      value.path = newPath;
+      atomicJson(filename, value);
+    }
+    fs.renameSync(oldDir, newDir);
+  }
+}
+function updateReferences(spec, mapping) {
+  const replacements = new Map(mapping.map(([from, to]) => [
+    from.replace(/\.md$/i, "").toLocaleLowerCase("ru"), to.replace(/\.md$/i, "")
+  ]));
+  let changedNotes = 0, changedBoards = 0;
+  for (const note of core.list(spec.notesRoot).notes) {
+    const old = core.read(spec.notesRoot, note.path).content;
+    const updated = old.replace(/\[\[([^\]\r\n]{1,250})\]\]/g, (whole, target) => {
+      const pipe = target.indexOf("|");
+      const base = pipe < 0 ? target : target.slice(0, pipe);
+      const hashAt = base.indexOf("#");
+      const name = (hashAt < 0 ? base : base.slice(0, hashAt)).trim().replace(/\.md$/i, "");
+      const replacement = replacements.get(name.toLocaleLowerCase("ru"));
+      if (!replacement) return whole;
+      const anchor = hashAt < 0 ? "" : base.slice(hashAt);
+      const alias = pipe < 0 ? "" : target.slice(pipe);
+      return "[[" + replacement + anchor + alias + "]]";
+    });
+    if (updated !== old) {
+      advanced.saveNote(spec.notesRoot, spec.historyRoot, note.path, updated);
+      changedNotes++;
+    }
+  }
+  for (const item of advanced.listCanvases(spec.canvasRoot)) {
+    const board = advanced.readCanvas(spec.canvasRoot, item.name);
+    let touched = false;
+    for (const card of board.nodes) {
+      const target = mapping.find(([from]) => card.type === "file" && card.file === from);
+      if (target) { card.file = target[1]; touched = true; }
+    }
+    if (touched) { advanced.saveCanvas(spec.canvasRoot, item.name, board); changedBoards++; }
+  }
+  return { changedNotes, changedBoards };
+}
+
 function renameNote(spec, oldPath, nextPath) {
   const from = core.normalizePath(oldPath), to = core.normalizePath(nextPath);
   if (from === to) return { from, to, unchanged: true };
@@ -112,7 +166,8 @@ function renameNote(spec, oldPath, nextPath) {
     if (!fs.lstatSync(at).isDirectory() || fs.lstatSync(at).isSymbolicLink()) throw fail("Небезопасная папка.");
   }
   fs.renameSync(source, dest);
-  return { from, to };
+  rebaseHistory(spec, [[from, to]]);
+  return { from, to, ...updateReferences(spec, [[from, to]]) };
 }
 function moveFolder(spec, oldPath, nextPath) {
   const from = core.normalizePath(oldPath, true), to = core.normalizePath(nextPath, true);
@@ -141,8 +196,12 @@ function moveFolder(spec, oldPath, nextPath) {
     }
   }
   verify(source);
+  const moved = core.list(spec.notesRoot).notes
+    .filter(note => note.path.startsWith(from + "/"))
+    .map(note => [note.path, to + note.path.slice(from.length)]);
   fs.renameSync(source, dest);
-  return { from, to };
+  rebaseHistory(spec, moved);
+  return { from, to, moved: moved.length, ...updateReferences(spec, moved) };
 }
 function copyTree(src, dst, report, rel = "") {
   safeDir(dst);
