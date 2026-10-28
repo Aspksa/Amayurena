@@ -807,5 +807,14 @@
     }
     catch (error) { message("Не удалось открыть хранилище: " + error.message, true); }
   }
-  window.AmayurenaKnowledge = { open };
+  async function beforeInsightsWrite() {
+    await saveNow();
+    if(active && revision>committed) throw Error("Есть несохранённый текст. Сначала сохраните заметку.");
+    await window.AmayurenaKnowledgeAdvanced.savePending();
+  }
+  async function reloadInsightsSource(path) {
+    if(active===path) await openNote(path,true);
+    else await refresh();
+  }
+  window.AmayurenaKnowledge = { open, openNote, beforeInsightsWrite, reloadInsightsSource };
 })();
