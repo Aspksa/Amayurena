@@ -253,7 +253,13 @@
           </section>
           <section id="knowledge-bases-panel" class="knowledge-bases-panel" hidden aria-label="Таблица Bases">
             <h3>Bases — свойства заметок</h3>
-            <p class="knowledge-advanced-help">Таблица строится автоматически из метаданных в начале Markdown-файлов (frontmatter). Нажмите строку, чтобы открыть заметку.</p>
+            <p class="knowledge-advanced-help">Собственные таблицы знаний. Изменяйте свойства заметок прямо в ячейках, выбирайте типы полей, создавайте сохранённые виды и группировки.</p>
+            <div class="knowledge-bases-view-controls">
+              <label for="knowledge-bases-views">Сохранённые виды</label>
+              <select id="knowledge-bases-views"><option value="">Текущий вид</option></select>
+              <button id="knowledge-bases-save-view" class="btn btn-primary" type="button">＋ Сохранить вид</button>
+              <button id="knowledge-bases-delete-view" class="btn btn-soft" type="button">Удалить вид</button>
+            </div>
             <div class="knowledge-advanced-toolbar">
               <label class="sr-only" for="knowledge-bases-search">Поиск по таблице</label>
               <input id="knowledge-bases-search" type="search" placeholder="Поиск по заметкам…">
@@ -261,6 +267,26 @@
               <select id="knowledge-bases-property"></select>
               <label class="sr-only" for="knowledge-bases-value">Фильтр по значению поля</label>
               <input id="knowledge-bases-value" type="search" placeholder="Значение поля…">
+              <label for="knowledge-bases-sort">Сортировать:</label>
+              <select id="knowledge-bases-sort"></select>
+              <label for="knowledge-bases-direction">Порядок:</label>
+              <select id="knowledge-bases-direction"><option value="asc">По возрастанию</option><option value="desc">По убыванию</option></select>
+              <label for="knowledge-bases-group">Группировка:</label>
+              <select id="knowledge-bases-group"><option value="">Без группировки</option></select>
+              <label for="knowledge-bases-layout">Вид:</label>
+              <select id="knowledge-bases-layout"><option value="table">Таблица</option><option value="cards">Карточки</option></select>
+            </div>
+            <div class="knowledge-bases-schema">
+              <label for="knowledge-bases-new-field">Новое поле:</label>
+              <input id="knowledge-bases-new-field" maxlength="40" placeholder="Например, priority">
+              <label for="knowledge-bases-type">Тип поля:</label>
+              <select id="knowledge-bases-type">
+                <option value="text">Текст</option><option value="number">Число</option>
+                <option value="date">Дата</option><option value="checkbox">Флажок</option>
+                <option value="select">Выбор</option><option value="tags">Метки</option>
+              </select>
+              <button id="knowledge-bases-add-field" class="btn btn-soft" type="button">Добавить поле</button>
+              <span id="knowledge-bases-message" role="status"></span>
             </div>
             <p id="knowledge-bases-count" class="knowledge-advanced-help"></p>
             <div class="knowledge-bases-wrap" id="knowledge-bases-table"></div>
