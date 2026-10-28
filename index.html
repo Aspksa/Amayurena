@@ -16,6 +16,7 @@
   <script defer src="./knowledge-native.js"></script>
   <script defer src="./knowledge-editor-tools.js"></script>
   <script defer src="./knowledge-markdown.js"></script>
+  <script defer src="./knowledge-canvas-layout.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge.js"></script>
   <script defer src="./app.js"></script>
@@ -233,23 +234,44 @@
           </section>
           <section id="knowledge-canvas-panel" class="knowledge-canvas-panel" hidden aria-label="Интерактивная доска Canvas">
             <h3>Canvas — доска идей</h3>
-            <p class="knowledge-advanced-help">Создавайте карточки текста и заметок, перемещайте их мышью или касанием, связывайте друг с другом. Изменения сохраняются локально.</p>
+            <p class="knowledge-advanced-help">Создавайте собственные карточки и группы. Перетаскивайте элементы, меняйте масштаб, перемещайтесь по мини-карте. Изменения защищены от конфликтов между окнами.</p>
             <div class="knowledge-advanced-toolbar">
               <label class="sr-only" for="knowledge-canvas-select">Выбор доски</label>
-              <select id="knowledge-canvas-select"></select>
+              <select id="knowledge-canvas-select" aria-label="Выберите доску"></select>
               <button id="knowledge-canvas-new" class="btn btn-primary" type="button">＋ Доска</button>
               <button id="knowledge-canvas-text" class="btn btn-soft" type="button">＋ Текст</button>
               <button id="knowledge-canvas-file" class="btn btn-soft" type="button">＋ Заметка</button>
+              <button id="knowledge-canvas-group" class="btn btn-soft" type="button">＋ Группа</button>
+              <button id="knowledge-canvas-layout" class="btn btn-soft" type="button">Упорядочить</button>
               <button id="knowledge-canvas-save" class="btn btn-soft" type="button">Сохранить</button>
               <button id="knowledge-canvas-delete" class="btn btn-danger" type="button">Удалить доску</button>
             </div>
-            <div class="knowledge-canvas-viewport" aria-label="Рабочая область Canvas" tabindex="0">
-              <div class="knowledge-canvas-surface">
-                <svg id="knowledge-canvas-edges" class="knowledge-canvas-edges" viewBox="0 0 3500 2600" aria-hidden="true"></svg>
-                <div id="knowledge-canvas-nodes" class="knowledge-canvas-nodes"></div>
+            <div class="knowledge-canvas-navigation">
+              <div class="knowledge-canvas-zoom-controls" role="group" aria-label="Масштаб Canvas">
+                <button id="knowledge-canvas-zoom-out" type="button" aria-label="Уменьшить масштаб">−</button>
+                <output id="knowledge-canvas-zoom-label" aria-live="polite">100%</output>
+                <button id="knowledge-canvas-zoom-in" type="button" aria-label="Увеличить масштаб">＋</button>
+                <button id="knowledge-canvas-zoom-reset" type="button">100%</button>
+                <button id="knowledge-canvas-zoom-fit" type="button">Вписать</button>
+              </div>
+              <span class="knowledge-advanced-help">Ctrl + колесо — масштаб; средняя кнопка мыши — перемещение. Мини-карта — быстрый переход.</span>
+            </div>
+            <div id="knowledge-canvas-viewport" class="knowledge-canvas-viewport" aria-label="Рабочая область Canvas" tabindex="0">
+              <div id="knowledge-canvas-space" class="knowledge-canvas-space">
+                <div class="knowledge-canvas-surface">
+                  <div id="knowledge-canvas-groups" class="knowledge-canvas-groups"></div>
+                  <svg id="knowledge-canvas-edges" class="knowledge-canvas-edges" viewBox="0 0 3500 2600" aria-hidden="true"></svg>
+                  <div id="knowledge-canvas-nodes" class="knowledge-canvas-nodes"></div>
+                </div>
               </div>
             </div>
-            <div id="knowledge-canvas-status" class="knowledge-canvas-status" role="status">Создайте доску, чтобы начать.</div>
+            <div class="knowledge-canvas-footer">
+              <div id="knowledge-canvas-status" class="knowledge-canvas-status" role="status">Создайте доску, чтобы начать.</div>
+              <div class="knowledge-canvas-minimap-panel">
+                <span>МИНИ-КАРТА · НАЖМИТЕ ДЛЯ ПЕРЕХОДА</span>
+                <svg id="knowledge-canvas-minimap" viewBox="0 0 200 150" role="img" aria-label="Мини-карта расположения групп, карточек и текущей области"></svg>
+              </div>
+            </div>
           </section>
           <section id="knowledge-bases-panel" class="knowledge-bases-panel" hidden aria-label="Таблица Bases">
             <h3>Bases — свойства заметок</h3>
