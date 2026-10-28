@@ -1,0 +1,40 @@
+.knowledge-layout { display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr) minmax(180px,230px);gap:16px;min-height:630px;align-items:start }
+.knowledge-sidebar,.knowledge-document,.knowledge-inspector,.knowledge-graph-panel { background:#fff;border:1px solid #ede6dc;border-radius:17px;min-width:0;padding:18px }
+.knowledge-sidebar { position:sticky;top:20px;max-height:calc(100vh - 80px);overflow:auto }
+.knowledge-actions { display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 }
+.knowledge-actions .btn { padding:9px 12px;font-size:12px }
+.knowledge-sidebar input { display:block;width:100%;border:1px solid #e4ded4;border-radius:10px;padding:11px;font-size:13px;background:#fff }
+.knowledge-tree { display:grid;gap:12px;margin-top:17px }
+.knowledge-folder-group { display:grid;gap:4px }
+.knowledge-folder-title { font-size:11px;color:#a18352;letter-spacing:.04em;font-weight:700;padding:9px 7px 4px;overflow-wrap:anywhere }
+.knowledge-note { display:flex;align-items:center;gap:8px;padding:10px 9px;width:100%;font-size:13px;text-align:left;border:1px solid transparent;background:transparent;border-radius:9px;color:#665d52;overflow-wrap:anywhere }
+.knowledge-note:hover { background:#fcf7ed }
+.knowledge-note.selected { color:#926c37;background:#fbf2e1;border-color:#ead8b6 }
+.knowledge-note-icon { color:#b8965a }
+.knowledge-editor-header { display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid #eee7dc;margin-bottom:18px }
+.knowledge-document h3,.knowledge-inspector h3 { font:500 22px Georgia,serif;margin:0 }
+.knowledge-path { display:block;font-size:12px;color:#947f64;overflow-wrap:anywhere }
+.knowledge-editor-controls { display:flex;gap:8px;flex-wrap:wrap }
+.knowledge-editor-controls .btn { padding:8px 11px }
+.knowledge-editor { display:block;width:100%;height:340px;min-height:240px;resize:vertical;border:1px solid #e9e1d5;background:#fffefc;color:#3c3833;padding:18px;border-radius:11px;font:14px/1.7 ui-monospace,"Cascadia Code",Consolas,monospace }
+.knowledge-preview { line-height:1.75;font-size:14px;color:#4d473e;overflow-wrap:anywhere;min-height:80px;padding:10px 4px }
+.knowledge-preview h1,.knowledge-preview h2,.knowledge-preview h3 { font-family:Georgia,serif;line-height:1.25;margin:15px 0 9px;font-weight:500 }
+.knowledge-preview h1 { font-size:26px }.knowledge-preview h2 { font-size:22px }.knowledge-preview h3 { font-size:19px }
+.knowledge-preview p { margin:9px 0;white-space:pre-wrap }
+.knowledge-wikilink { display:inline;border:0;padding:0;color:#9b712e;background:transparent;text-decoration:underline;text-underline-offset:3px;font-size:inherit }
+.knowledge-wikilink.missing { color:#bb8078;text-decoration-style:dashed }
+.knowledge-backlinks { display:grid;gap:8px;margin-top:15px }
+.knowledge-backlink { padding:10px;border:1px solid #ebe3d4;border-radius:9px;background:#fffaf1;color:#80613e;text-align:left;overflow-wrap:anywhere;font-size:12px }
+.knowledge-placeholder { font-size:13px;line-height:1.6;color:#aaa095;margin:10px 0 }
+.knowledge-status { color:#8f7959;font-size:12px;min-height:25px;line-height:1.6;overflow-wrap:anywhere }
+.knowledge-status[data-error="true"] { color:#af493c }
+.knowledge-graph-panel { grid-column:2/4; }
+.knowledge-graph { display:block;width:100%;height:auto;background:#fffefa;border-radius:13px;border:1px solid #eee6d8;min-height:380px }
+.knowledge-graph g { cursor:pointer }
+.knowledge-graph g:hover circle { fill:#d4ad6e }
+.knowledge-summary { font-size:12px;color:#999084 }
+.knowledge-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px;flex-wrap:wrap }
+.knowledge-inspector h3 { margin-bottom:12px }
+.knowledge-tip { font-size:12px;line-height:1.7;color:#9c9487 }
+@media(max-width:1150px) { .knowledge-layout { grid-template-columns:220px minmax(0,1fr) }.knowledge-inspector { grid-column:1/-1 }.knowledge-graph-panel { grid-column:2 } }
+@media(max-width:740px) { .knowledge-layout { grid-template-columns:1fr }.knowledge-sidebar { position:static;max-height:370px }.knowledge-inspector,.knowledge-graph-panel { grid-column:1 }.knowledge-document { padding:14px } }
