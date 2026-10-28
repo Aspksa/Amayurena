@@ -281,6 +281,53 @@
         });
         uploader.append(uploadButton, uploadInput, uploadHelp, uploadStatus);
         panel.append(uploader);
+        const zipUploader = node("div", "am-upload-row");
+        const zipButton = button("Установить все 10 поз из ZIP", () => zipInput.click(), "am-primary");
+        const zipInput = node("input");
+        zipInput.type = "file";
+        zipInput.accept = ".zip,application/zip,application/x-zip-compressed";
+        zipInput.hidden = true;
+        zipInput.setAttribute("aria-label", "Выбрать архив Amayurena_10_avatars.zip");
+        const zipNote = node("p", "am-help-text", "Установит все 10 оригинальных WebP в папку assets/avatars проекта. Требуется запуск через Amayurena.bat.");
+        const zipStatus = node("p", "am-upload-status", "");
+        zipStatus.setAttribute("role", "status");
+        zipInput.addEventListener("change", async () => {
+          const file = zipInput.files && zipInput.files[0];
+          zipInput.value = "";
+          if (!file) return;
+          if (!file.name.toLowerCase().endsWith(".zip") || file.size > 12 * 1024 * 1024) {
+            zipStatus.textContent = "Выберите ZIP не более 12 МБ.";
+            return;
+          }
+          if (location.protocol === "file:") {
+            zipStatus.textContent = "Запустите Amayurena.bat, чтобы записать изображения в папку проекта.";
+            return;
+          }
+          if (!confirm("Установить 10 поз из ZIP? Существующие файлы и сохранённые в браузере позы будут заменены.")) return;
+          zipButton.disabled = true;
+          zipStatus.textContent = "Проверка и установка архива…";
+          try {
+            const response = await fetch("/api/avatar/install", {
+              method: "POST",
+              headers: { "Content-Type": "application/zip" },
+              body: file
+            });
+            const result = await response.json();
+            if (!response.ok || result.installed !== 10) {
+              throw new Error(result.error || "Установка не завершена.");
+            }
+            window.AmayurenaAvatarAssetsApi.reloadInstalled();
+            buildSettings();
+            render();
+            zipStatus.textContent = "Готово: 10 поз установлены в assets/avatars.";
+          } catch (error) {
+            zipStatus.textContent = "Ошибка: " + error.message;
+          } finally {
+            zipButton.disabled = false;
+          }
+        });
+        zipUploader.append(zipButton, zipInput, zipNote, zipStatus);
+        panel.append(zipUploader);
       }
       left.append(panel);
     }
