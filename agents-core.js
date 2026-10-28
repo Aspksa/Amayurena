@@ -9,7 +9,8 @@
   const STORAGE_KEY = "amayurena.agents.v1";
   const BACKUP_VERSION = 1;
   const MAX_AGENTS = 500;
-  const LIMITS = Object.freeze({ name: 60, role: 60, description: 400, instructions: 6000 });
+  const LIMITS = Object.freeze({ name: 60, role: 60, description: 400, instructions: 6000, model: 120 });
+  const AVAILABLE_TOOLS = Object.freeze(["text_statistics", "calculate", "current_time_utc"]);
 
   function safeString(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -31,8 +32,15 @@
     const role = safeString(input.role) || "Универсальный";
     const description = safeString(input.description);
     const instructions = safeString(input.instructions);
+    const model = safeString(input.model);
+    const enabledTools = input.enabledTools == null ? [] : input.enabledTools;
+    if (!Array.isArray(enabledTools) || enabledTools.length > AVAILABLE_TOOLS.length ||
+        enabledTools.some(t => !AVAILABLE_TOOLS.includes(t)) || new Set(enabledTools).size !== enabledTools.length) {
+      throw new Error("Некорректный список инструментов.");
+    }
+    if (model && !/^[\w.\/:+-]+$/.test(model)) throw new Error("Некорректное имя модели.");
     if (!name) throw new Error("Укажите имя агента.");
-    for (const [field, value] of Object.entries({ name, role, description, instructions })) {
+    for (const [field, value] of Object.entries({ name, role, description, instructions, model })) {
       if (value.length > LIMITS[field]) throw new Error("Превышена длина поля: " + field);
     }
     const now = opts.now || new Date().toISOString();
@@ -43,6 +51,8 @@
       role,
       description,
       instructions,
+      model,
+      enabledTools: [...enabledTools],
       createdAt: opts.createdAt || now,
       updatedAt: now
     };
@@ -95,5 +105,5 @@
     );
   }
 
-  return { STORAGE_KEY, MAX_AGENTS, LIMITS, normalizeAgent, parseBackup, makeBackup, filterAgents };
+  return { STORAGE_KEY, MAX_AGENTS, LIMITS, AVAILABLE_TOOLS, normalizeAgent, parseBackup, makeBackup, filterAgents };
 });
