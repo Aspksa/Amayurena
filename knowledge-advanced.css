@@ -176,3 +176,19 @@
 .knowledge-map-timeline{border-top:1px solid #e8dece;margin-top:16px;padding-top:12px}
 .knowledge-map-timeline h5{color:#92734a}
 @media(max-width:740px){.knowledge-map-catalog-controls select{max-width:none;flex:1 1 100%}#knowledge-canvas-template{flex:1 1 100%}}
+
+
+/* Bases 2.0: monthly calendar and note references */
+.knowledge-bases-calendar-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:11px;border:1px solid #e8dbc7;border-radius:11px;background:#faf5e9;font-size:12px;color:#85704f}
+.knowledge-bases-calendar-controls[hidden]{display:none!important}
+.knowledge-bases-calendar-controls input,.knowledge-bases-calendar-controls select{padding:9px;border:1px solid #dccbad;border-radius:8px;background:white;color:#65523a}
+.knowledge-bases-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.knowledge-bases-month-weekday{text-align:center;font-size:11px;font-weight:650;color:#a17f52;padding:6px}
+.knowledge-bases-month-day{min-height:116px;padding:7px;background:#fff;border:1px solid #ebdfcf;border-radius:9px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.knowledge-bases-month-day.empty{background:#f8f5f0;opacity:.6}
+.knowledge-bases-month-day>strong{font-size:12px;color:#83643e}
+.knowledge-bases-calendar-entry{border:0;background:#f8eedb;padding:6px;border-radius:5px;text-align:left;color:#775a35;font-size:10px;overflow-wrap:anywhere}
+.knowledge-bases-calendar-entry:hover{background:#eddbb9}
+.knowledge-bases-calendar-more{font-size:10px;color:#997c4b}
+.knowledge-bases-relation-open{background:transparent;border:0;padding:4px;text-decoration:underline;color:#9470a5;cursor:pointer;font-size:11px}
+@media(max-width:850px){.knowledge-bases-month-grid{overflow-x:auto;min-width:640px}.knowledge-bases-panel{overflow-x:auto}}
