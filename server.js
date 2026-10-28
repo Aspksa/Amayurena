@@ -8,6 +8,7 @@ const engine = require("./server-core");
 const avatarInstaller = require("./avatar-package");
 const avatarPublisher = require("./avatar-publisher");
 const knowledge = require("./knowledge-core");
+const knowledgeAdvanced = require("./knowledge-advanced-core");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -17,6 +18,9 @@ const STATIC_FILES = Object.freeze({
   "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
   "/knowledge.css": ["knowledge.css", "text/css; charset=utf-8"],
   "/knowledge.js": ["knowledge.js", "text/javascript; charset=utf-8"],
+  "/knowledge-advanced.js": ["knowledge-advanced.js", "text/javascript; charset=utf-8"],
+  "/knowledge-markdown.js": ["knowledge-markdown.js", "text/javascript; charset=utf-8"],
+  "/knowledge-advanced.css": ["knowledge-advanced.css", "text/css; charset=utf-8"],
   "/avatar.css": ["avatar.css", "text/css; charset=utf-8"],
   "/avatar.js": ["avatar.js", "text/javascript; charset=utf-8"],
   "/avatar-assets.js": ["avatar-assets.js", "text/javascript; charset=utf-8"],
@@ -83,6 +87,8 @@ function createServer(options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
   const avatarRoot = options.avatarDirectory || BASE_DIR;
   const knowledgeRoot = options.knowledgeDirectory || path.join(BASE_DIR, "data", "knowledge");
+  const historyRoot = options.knowledgeHistoryDirectory || path.join(path.dirname(knowledgeRoot), "knowledge-history");
+  const canvasRoot = options.knowledgeCanvasDirectory || path.join(path.dirname(knowledgeRoot), "canvases");
   let busy = 0;
   let avatarPublishing = false;
   return http.createServer(async (req, res) => {
@@ -113,14 +119,51 @@ function createServer(options = {}) {
       try { return json(res, 200, knowledge.graph(knowledgeRoot)); }
       catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка построения графа." }); }
     }
+    if (pathname === "/api/knowledge/bases" && req.method === "GET") {
+      try { return json(res, 200, knowledgeAdvanced.bases(knowledgeRoot)); }
+      catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось открыть таблицу Bases." }); }
+    }
+    if (pathname === "/api/knowledge/history" && req.method === "GET") {
+      try {
+        const note = new URL(req.url, "http://localhost").searchParams.get("path");
+        return json(res, 200, { versions: knowledgeAdvanced.history(historyRoot, knowledge.normalizePath(note)) });
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка истории." }); }
+    }
+    if (pathname === "/api/knowledge/history/version" && req.method === "GET") {
+      try {
+        const q = new URL(req.url, "http://localhost").searchParams;
+        return json(res, 200, knowledgeAdvanced.readVersion(historyRoot, knowledge.normalizePath(q.get("path")), q.get("id")));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Версия недоступна." }); }
+    }
+    if (pathname === "/api/knowledge/history/restore" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        return json(res, 200, knowledgeAdvanced.restoreNote(knowledgeRoot, historyRoot, body && body.path, body && body.id));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось восстановить заметку." }); }
+    }
+    if (pathname === "/api/knowledge/canvases" && req.method === "GET") {
+      try { return json(res, 200, { boards: knowledgeAdvanced.listCanvases(canvasRoot) }); }
+      catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось прочитать доски." }); }
+    }
+    if (pathname === "/api/knowledge/canvas" && ["GET", "POST", "DELETE"].includes(req.method)) {
+      try {
+        const q = new URL(req.url, "http://localhost").searchParams;
+        if (req.method === "GET") return json(res, 200, knowledgeAdvanced.readCanvas(canvasRoot, q.get("name")));
+        if (req.method === "DELETE") return json(res, 200, knowledgeAdvanced.deleteCanvas(canvasRoot, q.get("name")));
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        return json(res, 200, knowledgeAdvanced.saveCanvas(canvasRoot, body && body.name, body && body.board));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка Canvas." }); }
+    }
     if (pathname === "/api/knowledge/note" && ["GET", "POST", "DELETE"].includes(req.method)) {
       try {
         const search = new URL(req.url, "http://localhost").searchParams;
         if (req.method === "GET") return json(res, 200, knowledge.read(knowledgeRoot, search.get("path")));
-        if (req.method === "DELETE") return json(res, 200, knowledge.remove(knowledgeRoot, search.get("path")));
+        if (req.method === "DELETE") return json(res, 200, knowledgeAdvanced.deleteNote(knowledgeRoot, historyRoot, search.get("path")));
         if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON-запрос." });
         const body = await readJson(req);
-        return json(res, 200, knowledge.save(knowledgeRoot, body && body.path, body && body.content));
+        return json(res, 200, knowledgeAdvanced.saveNote(knowledgeRoot, historyRoot, body && body.path, body && body.content));
       } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка работы с заметкой." }); }
     }
     if (pathname === "/api/knowledge/folder" && req.method === "POST") {
