@@ -14,7 +14,8 @@
   let historyToken = 0;
   const basesState = { types: {}, views: [], formulas: {}, sha: "", currentView: "", busy: false };
   const basesMath = window.AmayurenaBasesMath;
-  const basesTypes = ["text", "number", "date", "checkbox", "select", "tags"];
+  const basesCalendar = window.AmayurenaBasesCalendar;
+  const basesTypes = ["text", "number", "date", "checkbox", "select", "tags", "relation"];
   const basesBuiltin = ["title", "folder", "updatedAt"];
   const basesReserved = new Set(["title", "folder", "updatedAt"]);
 
@@ -615,6 +616,11 @@
       fillOptions("knowledge-bases-property",config.columns);
       fillOptions("knowledge-bases-sort",config.columns);
       fillOptions("knowledge-bases-group",config.columns,"Без группировки");
+      const dateFields=Object.keys(basesState.types).filter(key=>basesState.types[key]==="date");
+      if(!dateFields.length&&config.columns.includes("due"))dateFields.push("due");
+      fillOptions("knowledge-bases-calendar-field",dateFields.length?dateFields:["due"]);
+      const ym=new Date().toISOString().slice(0,7);
+      if(!$("knowledge-bases-calendar-month").value)$("knowledge-bases-calendar-month").value=ym;
       renderViewSelect();
       renderBases();
     } catch (e) {
@@ -737,6 +743,16 @@
     const type=basesState.types[key] || (Array.isArray(row.properties[key])?"tags":"text");
     const value=cellValue(row,key);
     const label=mk("button","knowledge-bases-cell-button",value || "＋");
+    if(type==="relation"&&/^\[\[[^\]]+\]\]$/.test(value)){
+      const target=value.slice(2,-2);
+      const path=/\.md$/i.test(target)?target:target+".md";
+      if(config.notes.some(n=>n.path===path) || config.rows.some(n=>n.path===path)){
+        const open=mk("button","knowledge-bases-relation-open","Открыть связь");
+        open.type="button";open.title=path;
+        open.addEventListener("click",()=>{void config.callbacks.onNoteOpen(path);});
+        td.append(open);
+      }
+    }
     label.type="button";
     label.title="Изменить поле "+key+" · "+type;
     label.addEventListener("click",()=>{
@@ -784,8 +800,42 @@
     });
     td.append(label);return td;
   }
+  function renderCalendarGrid(rows){
+    const output=$("knowledge-bases-table");
+    const ym=$("knowledge-bases-calendar-month").value||new Date().toISOString().slice(0,7);
+    const field=$("knowledge-bases-calendar-field").value||"due";
+    let model;
+    try{model=basesCalendar.calendar(ym,rows,field);}
+    catch(e){
+      output.replaceChildren(mk("p","knowledge-placeholder","Ошибка календаря: "+e.message));return;
+    }
+    const labels=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+    const grid=mk("div","knowledge-bases-month-grid");
+    for(const label of labels)grid.append(mk("div","knowledge-bases-month-weekday",label));
+    for(const week of model.weeks)for(const cell of week){
+      const day=mk("div","knowledge-bases-month-day"+(!cell.date?" empty":""));
+      if(cell.date){
+        day.append(mk("strong","",String(cell.day)));
+        for(const row of cell.notes.slice(0,9)){
+          const button=mk("button","knowledge-bases-calendar-entry",row.title);
+          button.type="button";button.title=row.path;
+          button.addEventListener("click",()=>{void config.callbacks.onNoteOpen(row.path);});
+          day.append(button);
+        }
+        if(cell.notes.length>9)day.append(mk("span","knowledge-bases-calendar-more","+"+(cell.notes.length-9)+" записей"));
+      }
+      grid.append(day);
+    }
+    output.append(grid);
+    const notDated=rows.filter(row=>!/^\d{4}-\d{2}-\d{2}$/.test(cellValue(row,field)));
+    if(notDated.length)output.append(mk("p","knowledge-placeholder",
+      "Без даты в поле «"+field+"»: "+notDated.length+" заметок (не показаны на сетке)."));
+    $("knowledge-bases-count").textContent=model.totalEntries+" записей в месяце "+model.month+
+      " · поле "+field+" · всего после фильтра "+rows.length;
+  }
   function renderBases() {
     const container=$("knowledge-bases-table");
+    $("knowledge-bases-calendar-controls").hidden=$("knowledge-bases-layout").value!=="calendar";
     container.replaceChildren();
     const phrase=$("knowledge-bases-search").value.toLocaleLowerCase("ru").trim();
     const state=formView();
@@ -803,6 +853,11 @@
     $("knowledge-bases-count").textContent=rows.length+" из "+config.rows.length+
       " заметок · "+(state.layout==="cards"?"карточки":state.layout==="calendar"?"календарь дат":"таблица")+
       (state.group?" · группировка "+state.group:"");
+    if(state.layout==="calendar"){
+      renderCalendarGrid(rows);
+      $("knowledge-bases-aggregate").textContent="";
+      return;
+    }
     const groups=new Map();
     for (const item of rows.slice(0,250)) {
       const grouping=state.layout==="calendar"?(state.group||"due"):state.group;
@@ -987,6 +1042,18 @@
     $("knowledge-bases-add-field").addEventListener("click",()=>{void createField();});
     $("knowledge-bases-add-formula").addEventListener("click",()=>{void createFormula();});
     $("knowledge-bases-filter-op").addEventListener("change",renderBases);
+    $("knowledge-bases-calendar-month").addEventListener("change",renderBases);
+    $("knowledge-bases-calendar-field").addEventListener("change",renderBases);
+    $("knowledge-bases-calendar-prev").addEventListener("click",()=>{
+      const control=$("knowledge-bases-calendar-month");
+      control.value=basesCalendar.moveMonth(control.value||new Date().toISOString().slice(0,7),-1);
+      renderBases();
+    });
+    $("knowledge-bases-calendar-next").addEventListener("click",()=>{
+      const control=$("knowledge-bases-calendar-month");
+      control.value=basesCalendar.moveMonth(control.value||new Date().toISOString().slice(0,7),1);
+      renderBases();
+    });
 
     $("knowledge-history-close").addEventListener("click", () => $("knowledge-history-dialog").close());
     for (const element of document.querySelectorAll("[data-knowledge-mode]")) {
