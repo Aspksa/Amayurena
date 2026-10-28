@@ -163,12 +163,15 @@
             <button id="knowledge-mode" data-current="editor" data-knowledge-mode="graph" class="btn btn-soft" type="button">Граф</button>
             <button id="knowledge-canvas-tab" data-knowledge-mode="canvas" class="btn btn-soft" type="button">Canvas</button>
             <button id="knowledge-bases-tab" data-knowledge-mode="bases" class="btn btn-soft" type="button">Bases</button>
+            <button id="knowledge-backups-button" class="btn btn-soft" type="button">Резервные копии</button>
+            <button id="knowledge-trash-button" class="btn btn-soft" type="button">Корзина</button>
           </div>
         </div>
         <div class="knowledge-layout">
           <aside class="knowledge-sidebar" aria-label="Файлы базы знаний">
             <label class="sr-only" for="knowledge-search">Поиск по заметкам</label>
-            <input id="knowledge-search" type="search" maxlength="150" placeholder="Поиск заметок и текста…">
+            <input id="knowledge-search" type="search" maxlength="120" placeholder="Поиск по всему содержимому…" autocomplete="off">
+            <div id="knowledge-search-results" class="knowledge-search-results" hidden aria-live="polite"></div>
             <div class="knowledge-actions">
               <button id="knowledge-create" type="button" class="btn btn-primary">＋ Заметка</button>
               <button id="knowledge-folder" type="button" class="btn btn-soft">＋ Папка</button>
@@ -182,6 +185,7 @@
                 <strong id="knowledge-path" class="knowledge-path"></strong>
               </div>
               <div class="knowledge-editor-controls">
+                <button id="knowledge-rename" class="btn btn-soft" type="button">Переименовать / переместить</button>
                 <button id="knowledge-save" class="btn btn-soft" type="button">Сохранить</button>
                 <button id="knowledge-delete" class="btn btn-danger" type="button">Удалить</button>
               </div>
@@ -246,6 +250,35 @@
   </div>
 
 
+  <dialog id="knowledge-move-dialog" class="knowledge-create-dialog" aria-labelledby="knowledge-move-heading">
+    <form id="knowledge-move-form">
+      <h2 id="knowledge-move-heading">Переименование или перемещение</h2>
+      <p id="knowledge-move-source" class="knowledge-create-caption"></p>
+      <div class="knowledge-create-fields"><label>Новый путь внутри знаний
+        <input id="knowledge-move-destination" required maxlength="360" autocomplete="off" placeholder="Проекты/Новая заметка.md">
+      </label></div>
+      <p class="knowledge-tip">Для заметки сохраняйте расширение .md. Существующие файлы не перезаписываются.</p>
+      <p id="knowledge-move-error" class="knowledge-create-error" role="alert" hidden></p>
+      <footer class="knowledge-create-actions">
+        <button id="knowledge-move-cancel" class="btn btn-soft" type="button">Отмена</button>
+        <button id="knowledge-move-submit" class="btn btn-primary" type="submit">Применить</button>
+      </footer>
+    </form>
+  </dialog>
+  <dialog id="knowledge-trash-dialog" class="knowledge-create-dialog" aria-labelledby="knowledge-trash-heading">
+    <h2 id="knowledge-trash-heading">Корзина заметок</h2>
+    <p class="knowledge-tip">Удалённые заметки сохраняются локально до восстановления. Восстановление не заменяет существующие файлы.</p>
+    <div id="knowledge-trash-items" class="knowledge-maintenance-list"></div>
+    <footer class="knowledge-create-actions"><button id="knowledge-trash-close" class="btn btn-soft" type="button">Закрыть</button></footer>
+  </dialog>
+  <dialog id="knowledge-backups-dialog" class="knowledge-create-dialog" aria-labelledby="knowledge-backups-heading">
+    <h2 id="knowledge-backups-heading">Резервные копии знаний</h2>
+    <p class="knowledge-tip">Копируются заметки, их история, Canvas-доски и корзина. Копии хранятся локально рядом с проектом, в папке data/backups.</p>
+    <button id="knowledge-create-backup" class="btn btn-primary" type="button">Создать полную копию</button>
+    <div id="knowledge-backup-items" class="knowledge-maintenance-list"></div>
+    <p id="knowledge-backup-status" class="knowledge-create-caption"></p>
+    <footer class="knowledge-create-actions"><button id="knowledge-backups-close" class="btn btn-soft" type="button">Закрыть</button></footer>
+  </dialog>
   <dialog id="knowledge-create-dialog" class="knowledge-create-dialog" aria-labelledby="knowledge-create-heading">
     <form id="knowledge-create-form" novalidate>
       <header class="knowledge-create-header">
