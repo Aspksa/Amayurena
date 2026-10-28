@@ -74,3 +74,15 @@ test("limits API request body to 128 KiB and returns 413", async () => {
     assert.equal(response.status, 413);
   });
 });
+
+test("serves avatar scripts, styles and fallback art without exposing arbitrary files", async () => {
+  await withServer({ env: {} }, async base => {
+    for (const pathname of ["/avatar.js", "/avatar-assets.js", "/avatar.css", "/avatar-default.svg"]) {
+      const response = await fetch(base + pathname);
+      assert.equal(response.status, 200, pathname);
+      assert.ok((await response.text()).length > 50);
+    }
+    assert.equal((await fetch(base + "/assets/avatars/pose-01.webp")).status, 404);
+    assert.equal((await fetch(base + "/assets/avatars/../../server.js")).status, 404);
+  });
+});
