@@ -39,7 +39,7 @@ function atomicJson(file, value) {
 function stores(spec) {
   return {
     knowledge: spec.notesRoot, history: spec.historyRoot, canvases: spec.canvasRoot,
-    trash: spec.trashRoot, bases: spec.basesRoot || path.join(spec.notesRoot, ".bases"), backups: spec.backupsRoot
+    trash: spec.trashRoot, bases: spec.basesRoot || path.join(path.dirname(spec.notesRoot), ".knowledge-bases"), backups: spec.backupsRoot
   };
 }
 function search(notesRoot, raw) {
