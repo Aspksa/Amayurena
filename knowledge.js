@@ -138,26 +138,32 @@
     $("knowledge-pin").textContent = pinned ? "⌁ Открепить" : "⌁ Закрепить";
     $("knowledge-pin").setAttribute("aria-pressed", String(pinned));
   }
-  async function closeTab(path) {
-    if (path === active) {
-      await saveNow();
-      if (revision > committed) { message("Не удалось закрыть: сначала сохраните заметку.", true); return; }
-    }
-    workspace.close(path);
-    if (path === active) {
-      active = "";
-      ui.path.textContent = "";
-      ui.editor.value = "";
-      loadedSha = "";
-      revision = 0; committed = 0;
-      const next = workspace.state.tabs.at(-1);
-      if (next) await openNote(next);
-      else {
-        ui.panel.hidden = true;
-        void window.AmayurenaKnowledgeAdvanced.update(notes, "");
+  function closeTab(path) {
+    return navigate(async () => {
+      if (path === active) {
+        await saveNow();
+        if (revision > committed) {
+          message("Не удалось закрыть вкладку: сохранение не завершено.", true); return false;
+        }
       }
-    }
-    renderTabs(); renderTree(); renderShortcuts();
+      workspace.close(path);
+      if (path === active) {
+        active = "";
+        ui.path.textContent = "";
+        ui.editor.value = "";
+        loadedSha = "";
+        revision = 0; committed = 0;
+        const next = workspace.state.tabs.at(-1);
+        if (next) await openNoteImpl(next);
+        else {
+          ui.panel.hidden = true;
+          void window.AmayurenaKnowledgeAdvanced.update(notes, "");
+          setMode("editor");
+        }
+      }
+      renderTabs(); renderTree();
+      return true;
+    });
   }
   function renderTree() {
     const query = ui.search.value.trim().toLocaleLowerCase("ru");
@@ -308,7 +314,9 @@
     notes = list.notes;
     folders = list.folders;
     graph = links;
-    renderTree(); renderBacklinks(); renderGraph();
+    workspace.reconcile(notes.map(n => n.path));
+    renderTree(); renderBacklinks(); renderGraph(); renderTabs();
+    if (active) { renderBreadcrumbs(); updateActions(); }
     void window.AmayurenaKnowledgeAdvanced.update(notes, active);
   }
   function draftKey(path) { return "amayurena.knowledge.draft." + path; }
@@ -334,6 +342,7 @@
     if (!active || revision <= committed) return queue;
     const savedPath = active, value = ui.editor.value, version = revision;
     queue = queue.catch(() => {}).then(async () => {
+      if (savedPath === active && version <= committed) return;
       message("Сохраняется…");
       try {
         const reply = await post("/api/knowledge/note", { path: savedPath, content: value, expectedSha: loadedSha });
@@ -351,34 +360,53 @@
     });
     return queue;
   }
-  async function openNote(path, force = false) {
-    if (path === active && !force) { setMode("editor"); return; }
+  function navigate(fn) {
+    navigation = navigation.catch(() => {}).then(fn);
+    return navigation;
+  }
+  function openNote(path, force = false) {
+    return navigate(() => openNoteImpl(path, force));
+  }
+  async function openNoteImpl(path, force = false) {
+    if (path === active && !force) {
+      setMode("editor"); renderTabs(); updateActions(); return true;
+    }
     if (!force) {
       await saveNow();
-      if (active && revision > committed) return;
+      if (active && revision > committed) {
+        message("Переход отменён: текущая заметка не сохранена. Черновик сохранён в браузере.", true);
+        return false;
+      }
     }
     try {
       const record = await request("/api/knowledge/note?path=" + encodeURIComponent(path));
+      workspace.open(record.path);
       active = record.path;
       ui.editor.value = record.content;
       loadedSha = record.sha || "";
       try {
         const unsaved = sessionStorage.getItem(draftKey(record.path));
         if (unsaved !== null && unsaved !== record.content &&
-            confirm("Найден несохранённый черновик этой заметки в браузере. Восстановить его?")) {
+            confirm("Найден несохранённый черновик этой заметки. Восстановить его?")) {
           ui.editor.value = unsaved;
         }
-      } catch (_) { /* no browser storage */ }
+      } catch (_) { /* browser storage is optional */ }
       ui.path.textContent = record.path;
       ui.panel.hidden = false;
       revision = ui.editor.value === record.content ? 0 : 1;
       committed = 0;
-      renderTree(); renderPreview();
-      if (revision) { keepDraft(record.path, ui.editor.value); message("Восстановлен черновик. Нажмите «Сохранить»."); } renderBacklinks(); renderGraph();
+      renderTree(); renderPreview(); renderBacklinks(); renderGraph(); renderTabs(); renderBreadcrumbs(); updateActions();
       void window.AmayurenaKnowledgeAdvanced.update(notes, active);
       setMode("editor");
-      if (!revision) message("Готово к редактированию");
-    } catch (error) { message(error.message, true); }
+      if (revision) {
+        keepDraft(record.path, ui.editor.value);
+        message("Восстановлен черновик. Нажмите «Сохранить».");
+      } else message("Готово к редактированию");
+      return true;
+    } catch (error) {
+      message("Не удалось открыть вкладку: " + error.message, true);
+      return false;
+    }
   }
   function createError(text) {
     const target = $("knowledge-create-error");
@@ -479,9 +507,14 @@
     await saveNow();
     if (active && revision > committed) return;
     try {
-      await request("/api/knowledge/note?path=" + encodeURIComponent(active), { method: "DELETE" });
+      const oldPath = active;
+      await request("/api/knowledge/note?path=" + encodeURIComponent(oldPath), { method: "DELETE" });
+      workspace.forget(oldPath);
       active = ""; ui.editor.value = ""; ui.path.textContent = ""; ui.panel.hidden = true;
-      await refresh(); message("Заметка удалена. История сохранена.");
+      loadedSha = ""; revision = 0; committed = 0;
+      await refresh(); message("Заметка перемещена в корзину.");
+      const next = workspace.state.tabs.at(-1);
+      if (next) await openNote(next);
     } catch (error) { message(error.message, true); }
   }
 
@@ -559,6 +592,7 @@
       else if (kind === "folder" && active.startsWith(from + "/")) newActive = to + active.slice(from.length);
       $("knowledge-move-dialog").close();
       moveSource = null;
+      workspace.changePath(from, to, kind === "folder");
       await refresh();
       if (previousActive && newActive) await openNote(newActive, true);
       message("Перемещено без перезаписи: " + (result.moved || 1) + " элементов.");
@@ -688,7 +722,11 @@
       ui.save.addEventListener("click", () => { void saveNow(); });
       ui.mode.addEventListener("click", () => setMode(ui.mode.dataset.current === "graph" ? "editor" : "graph"));
     }
-    try { await refresh(); message("База знаний доступна локально."); }
+    try {
+      await refresh();
+      if (!active && workspace.state.tabs.length) await openNote(workspace.state.tabs.at(-1));
+      message("База знаний доступна локально.");
+    }
     catch (error) { message("Не удалось открыть хранилище: " + error.message, true); }
   }
   window.AmayurenaKnowledge = { open };
