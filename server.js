@@ -11,6 +11,7 @@ const knowledge = require("./knowledge-core");
 const knowledgeAdvanced = require("./knowledge-advanced-core");
 const knowledgeMaintenance = require("./knowledge-maintenance");
 const knowledgeBases = require("./knowledge-bases-core");
+const knowledgeInsights = require("./knowledge-insights-core");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -20,6 +21,7 @@ const STATIC_FILES = Object.freeze({
   "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
   "/knowledge.css": ["knowledge.css", "text/css; charset=utf-8"],
   "/knowledge.js": ["knowledge.js", "text/javascript; charset=utf-8"],
+  "/knowledge-insights.js": ["knowledge-insights.js", "text/javascript; charset=utf-8"],
   "/knowledge-native.js": ["knowledge-native.js", "text/javascript; charset=utf-8"],
   "/knowledge-editor-tools.js": ["knowledge-editor-tools.js", "text/javascript; charset=utf-8"],
   "/knowledge-advanced.js": ["knowledge-advanced.js", "text/javascript; charset=utf-8"],
@@ -174,6 +176,17 @@ function createServer(options = {}) {
         const body = await readJson(req);
         return json(res, 200, knowledgeMaintenance.moveFolder(maintenance, body && body.from, body && body.to));
       } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось переместить папку." }); }
+    }
+    if (pathname === "/api/knowledge/insights" && req.method === "GET") {
+      try { return json(res,200,knowledgeInsights.analyze(knowledgeRoot,canvasRoot,historyRoot)); }
+      catch(e) { return json(res,e.status||500,{error:e.status?e.message:"Не удалось построить карту знаний."}); }
+    }
+    if (pathname === "/api/knowledge/insights/accept" && req.method === "POST") {
+      try {
+        if(req.headers["content-type"]!=="application/json") return json(res,415,{error:"Ожидался JSON."});
+        const body=await readJson(req);
+        return json(res,200,knowledgeInsights.accept(knowledgeRoot,historyRoot,canvasRoot,body));
+      } catch(e) { return json(res,e.status||500,{error:e.status?e.message:"Не удалось сохранить предложенную связь."}); }
     }
     if (pathname === "/api/knowledge/graph" && req.method === "GET") {
       try { return json(res, 200, knowledge.graph(knowledgeRoot)); }

@@ -121,3 +121,43 @@
  .knowledge-canvas-footer {align-items:start}
  .knowledge-canvas-viewport {height:470px}
 }
+
+
+/* Package 14 — living source-grounded knowledge map */
+.knowledge-insights-panel { grid-column:2/4;min-width:0;background:#fff;border:1px solid #ede6dc;border-radius:17px;padding:19px }
+.knowledge-insights-panel [hidden] { display:none !important }
+.knowledge-insights-header { display:flex;align-items:start;justify-content:space-between;gap:16px;flex-wrap:wrap }
+.knowledge-insights-header h3 { font:500 24px Georgia,serif;color:#69573e;margin:0 0 8px }
+.knowledge-insights-header p,.knowledge-insights-review p { margin:0 0 10px;font-size:12px;color:#93836e;line-height:1.6 }
+#knowledge-insights-status { font-size:12px;color:#8c7755;line-height:1.6;overflow-wrap:anywhere }
+#knowledge-insights-status[data-error=true] { color:#ae493f }
+.knowledge-insights-stats { display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin:14px 0 }
+.knowledge-insights-stat { padding:13px;border-radius:11px;background:#faf5ed;border:1px solid #e7dfd2;display:grid;gap:3px }
+.knowledge-insights-stat strong { font:600 23px Georgia,serif;color:#927044 }
+.knowledge-insights-stat span { font-size:11px;color:#8c7b65 }
+.knowledge-insights-controls { display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin:14px 0 }
+.knowledge-insights-controls label { display:grid;gap:5px;min-width:140px;flex:1 1 180px;font-size:12px;color:#8b7658 }
+.knowledge-insights-controls input,.knowledge-insights-controls select { width:100%;border:1px solid #e2d7c4;border-radius:9px;padding:10px;background:#fffefc;color:#574d40 }
+.knowledge-insights-layout { display:grid;grid-template-columns:minmax(0,1.6fr) minmax(230px,.85fr);gap:14px;align-items:start }
+.knowledge-insights-graph-wrap { border:1px solid #e6dac8;background:#fffcf6;border-radius:13px;min-width:0;overflow:hidden;padding:10px }
+#knowledge-insights-graph { display:block;width:100%;height:auto;min-height:380px;max-height:560px }
+.knowledge-insights-vertex { cursor:pointer;outline:0 }
+.knowledge-insights-vertex:hover circle,.knowledge-insights-vertex:focus-visible circle { stroke-width:4;fill:#c9934a }
+.knowledge-insights-legend { font-size:11px;color:#9d8b70;line-height:1.5;margin:8px }
+.knowledge-insights-detail { border:1px solid #e8ddca;border-radius:12px;padding:15px;max-height:630px;overflow:auto;min-width:0 }
+.knowledge-insights-detail h4,.knowledge-insights-review h4 { font:500 20px Georgia,serif;color:#775c37;margin:0 0 12px;overflow-wrap:anywhere }
+.knowledge-insights-detail h5 { font-size:12px;color:#91764e;margin:16px 0 8px }
+.knowledge-insights-meta { font-size:11px;color:#887963;line-height:1.6;overflow-wrap:anywhere }
+.knowledge-insights-meta p { margin:5px 0 }
+.knowledge-insights-note-link { display:inline-block;text-align:left;max-width:100%;border:0;padding:5px 0;background:transparent;color:#98703c;text-decoration:underline;text-underline-offset:2px;font-size:12px;overflow-wrap:anywhere;cursor:pointer }
+.knowledge-insights-relation { border-top:1px solid #efe5d6;padding:9px 0;display:grid;gap:3px }
+.knowledge-insights-relation small,.knowledge-insights-small { font-size:11px;color:#928575;overflow-wrap:anywhere;line-height:1.55 }
+.knowledge-insights-review { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;margin-top:22px }
+.knowledge-insights-review section { min-width:0 }
+.knowledge-insights-review-row { display:grid;gap:7px;background:#fbf8f1;border:1px solid #ece0cf;border-radius:10px;padding:12px;margin:9px 0 }
+.knowledge-insights-review-row strong { font-size:12px;color:#65523c;overflow-wrap:anywhere }
+.knowledge-insights-review-row small { font-size:11px;color:#90816c;line-height:1.5;overflow-wrap:anywhere }
+.knowledge-insights-review-row .btn { justify-self:start;font-size:11px }
+@media(max-width:1150px) { .knowledge-insights-panel { grid-column:2 } }
+@media(max-width:850px) { .knowledge-insights-layout,.knowledge-insights-review { grid-template-columns:1fr } }
+@media(max-width:740px) { .knowledge-insights-panel { grid-column:1;padding:13px } }

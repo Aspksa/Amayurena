@@ -80,7 +80,8 @@
     $("knowledge-graph-panel").hidden = mode !== "graph";
     $("knowledge-canvas-panel").hidden = mode !== "canvas";
     $("knowledge-bases-panel").hidden = mode !== "bases";
-    $("knowledge-inspector").hidden = mode === "canvas" || mode === "bases";
+    $("knowledge-insights-panel").hidden = mode !== "insights";
+    $("knowledge-inspector").hidden = mode === "canvas" || mode === "bases" || mode === "insights";
     for (const item of document.querySelectorAll("[data-knowledge-mode]")) {
       item.classList.toggle("knowledge-active-tab", item.dataset.knowledgeMode === mode);
     }
