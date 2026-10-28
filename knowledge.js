@@ -12,6 +12,13 @@
   };
   let notes = [], folders = [], active = "", revision = 0, committed = 0, saveTimer = null;
   let loadedSha = "", searchTimer = null, searchGeneration = 0, moveSource = null;
+  const editorPrefs = (() => {
+    try { const saved=JSON.parse(localStorage.getItem("amayu.editor.preferences.v2")||"{}");
+      return {density:saved.density==="compact"?"compact":"comfortable",
+        split:saved.split===true,sync:saved.sync!==false,outline:saved.outline!==false};
+    }catch(_){return {density:"comfortable",split:false,sync:true,outline:true};}
+  })();
+  let syncingEditorScroll=false;
   let queue = Promise.resolve(), navigation = Promise.resolve(), graph = { nodes: [], edges: [], missing: [] }, initialized = false;
   const workspace = window.AmayurenaEditorTools.workspace(window.localStorage);
   const collapsed = new Set((() => {
@@ -250,9 +257,73 @@
     }
     if (last < line.length) parent.append(document.createTextNode(line.slice(last)));
   }
+  function storeEditorPrefs(){
+    try{localStorage.setItem("amayu.editor.preferences.v2",JSON.stringify(editorPrefs));}
+    catch(_){/* preferences are optional */}
+  }
+  function applyEditorPrefs(){
+    $("knowledge-view").dataset.density=editorPrefs.density;
+    $("knowledge-layout-density").value=editorPrefs.density;
+    $("knowledge-editor-layout").dataset.layout=editorPrefs.split?"split":"stack";
+    $("knowledge-editor-outline").hidden=!editorPrefs.outline;
+    for(const [id,flag] of [["knowledge-editor-view-split",editorPrefs.split],
+      ["knowledge-editor-sync",editorPrefs.sync],["knowledge-editor-outline-toggle",editorPrefs.outline]]) {
+      $(id).setAttribute("aria-pressed",String(flag));
+    }
+    $("knowledge-editor-view-split").textContent=editorPrefs.split?"Один столбец":"Две панели";
+    $("knowledge-editor-sync").textContent=editorPrefs.sync?"Прокрутка связана":"Прокрутка независимо";
+    $("knowledge-editor-outline-toggle").textContent=editorPrefs.outline?"Скрыть оглавление":"Показать оглавление";
+  }
+  function renderOutline(){
+    const nav=$("knowledge-outline-list");
+    nav.replaceChildren();
+    const parser=window.AmayurenaOutline;
+    if(!parser)return;
+    const {headings,lineCount}=parser.analyze(ui.editor.value);
+    $("knowledge-editor-line-count").textContent=lineCount+" стр. · "+ui.editor.value.length+" символов";
+    if(!headings.length){
+      nav.append(node("p","knowledge-placeholder","Заголовки начинаются с #, ## или ###."));
+      return;
+    }
+    for(const entry of headings.slice(0,150)){
+      const button=node("button","knowledge-outline-entry",entry.title);
+      button.type="button";
+      button.style.paddingLeft=((entry.level-1)*10+8)+"px";
+      button.title="Строка "+entry.line;
+      button.addEventListener("click",()=>{
+        const offset=parser.lineOffset(ui.editor.value,entry.line);
+        ui.editor.focus();
+        ui.editor.setSelectionRange(offset,offset);
+        const ratio=offset/Math.max(1,ui.editor.value.length);
+        ui.editor.scrollTop=parser.progressToPixels(ratio,ui.editor.scrollHeight,ui.editor.clientHeight);
+        if(editorPrefs.sync)syncEditorToPreview();
+      });
+      nav.append(button);
+    }
+  }
+  function syncEditorToPreview(){
+    if(!editorPrefs.sync||syncingEditorScroll||!window.AmayurenaOutline)return;
+    syncingEditorScroll=true;
+    try{
+      const ratio=ui.editor.scrollTop/Math.max(1,ui.editor.scrollHeight-ui.editor.clientHeight);
+      ui.preview.scrollTop=window.AmayurenaOutline.progressToPixels(ratio,
+        ui.preview.scrollHeight,ui.preview.clientHeight);
+    }finally{syncingEditorScroll=false;}
+  }
+  function syncPreviewToEditor(){
+    if(!editorPrefs.sync||syncingEditorScroll||!window.AmayurenaOutline)return;
+    syncingEditorScroll=true;
+    try{
+      const ratio=ui.preview.scrollTop/Math.max(1,ui.preview.scrollHeight-ui.preview.clientHeight);
+      ui.editor.scrollTop=window.AmayurenaOutline.progressToPixels(ratio,
+        ui.editor.scrollHeight,ui.editor.clientHeight);
+    }finally{syncingEditorScroll=false;}
+  }
   function renderPreview() {
     window.AmayurenaMarkdown.render(ui.preview, ui.editor.value,
       target => resolveLink(active, target), path => { void openNote(path); });
+    renderOutline();
+    syncEditorToPreview();
   }
   function renderBacklinks() {
     ui.backlinks.replaceChildren();
@@ -736,6 +807,19 @@
         beforeRestore: async () => { await saveNow(); if (active && revision > committed) throw new Error("Текущие изменения не сохранены."); },
         onReload: path => openNote(path, true)
       });
+      applyEditorPrefs();
+      $("knowledge-layout-density").addEventListener("change",e=>{
+        editorPrefs.density=e.target.value==="compact"?"compact":"comfortable";
+        storeEditorPrefs();applyEditorPrefs();
+      });
+      for(const [id,key] of [["knowledge-editor-view-split","split"],["knowledge-editor-sync","sync"],
+        ["knowledge-editor-outline-toggle","outline"]]){
+        $(id).addEventListener("click",()=>{
+          editorPrefs[key]=!editorPrefs[key];storeEditorPrefs();applyEditorPrefs();
+        });
+      }
+      ui.editor.addEventListener("scroll",syncEditorToPreview,{passive:true});
+      ui.preview.addEventListener("scroll",syncPreviewToEditor,{passive:true});
       ui.editor.addEventListener("input", scheduleSave);
       ui.editor.addEventListener("keydown", e => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void saveNow(); }

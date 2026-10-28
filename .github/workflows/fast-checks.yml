@@ -23,6 +23,8 @@ jobs:
           node --check knowledge-markdown.js
           node --check tests/knowledge-advanced.test.cjs
           node --check tests/knowledge-markdown.test.cjs
+          node --check knowledge-document-outline.js
+          node --check tests/knowledge-document-outline.test.cjs
           node --check knowledge-editor-tools.js
           node --check tests/knowledge-editor-tools.test.cjs
           node --check tests/knowledge-editor-navigation.test.cjs
