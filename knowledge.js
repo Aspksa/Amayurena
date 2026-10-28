@@ -182,7 +182,7 @@
     return queue;
   }
   async function openNote(path, force = false) {
-    if (path === active && !force) return;
+    if (path === active && !force) { setMode("editor"); return; }
     if (!force) {
       await saveNow();
       if (active && revision > committed) return;
