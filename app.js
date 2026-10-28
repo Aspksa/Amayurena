@@ -11,7 +11,7 @@
     search: $("agent-search"), resultCount: $("result-count"),
     dialog: $("agent-dialog"), form: $("agent-form"), dialogHeading: $("dialog-heading"),
     name: $("agent-name"), role: $("agent-role"), description: $("agent-description"),
-    instructions: $("agent-instructions"), formError: $("form-error"),
+    instructions: $("agent-instructions"), model: $("agent-model"), formError: $("form-error"),
     toast: $("toast"), warning: $("storage-warning"), importFile: $("import-file")
   };
   let agents = [];
@@ -61,6 +61,7 @@
 
   function navigate(page) {
     const target = page === "agents" ? "agents" : "home";
+    window.AmayurenaWorkspace.closeAgent();
     dom.home.hidden = target !== "home";
     dom.agentsView.hidden = target !== "agents";
     dom.pageTitle.textContent = target === "agents" ? "Агенты" : "Главная";
@@ -106,6 +107,7 @@
     const meta = element("span", "agent-date", "Изменён: " + new Date(agent.updatedAt).toLocaleDateString("ru-RU"));
     const actions = element("div", "card-actions");
     actions.append(
+      actionButton("Открыть", "btn btn-small btn-primary", () => openWorkspace(agent.id), "Открыть " + agent.name),
       actionButton("Изменить", "btn btn-small btn-soft", () => openEditor(agent.id), "Изменить " + agent.name),
       actionButton("Удалить", "btn btn-small btn-danger", () => removeAgent(agent.id), "Удалить " + agent.name)
     );
@@ -131,6 +133,16 @@
     }
   }
 
+  function openWorkspace(id) {
+    const selected = agents.find(item => item.id === id);
+    if (!selected) return;
+    if (location.hash !== "#agents") history.replaceState(null, "", "#agents");
+    navigate("agents");
+    window.AmayurenaWorkspace.openAgent(selected);
+    dom.pageTitle.textContent = selected.name;
+    document.title = selected.name + " — Amayurena";
+  }
+
   function openEditor(id) {
     const agent = id ? agents.find((item) => item.id === id) : null;
     if (id && !agent) return;
@@ -142,6 +154,10 @@
     dom.role.value = agent ? agent.role : "";
     dom.description.value = agent ? agent.description : "";
     dom.instructions.value = agent ? agent.instructions : "";
+    dom.model.value = agent ? (agent.model || "") : "";
+    for (const toolName of core.AVAILABLE_TOOLS) {
+      $("tool-" + toolName).checked = !!agent && (agent.enabledTools || []).includes(toolName);
+    }
     dom.dialog.showModal();
     dom.name.focus();
   }
@@ -159,7 +175,9 @@
     try {
       const draft = core.normalizeAgent({
         name: dom.name.value, role: dom.role.value,
-        description: dom.description.value, instructions: dom.instructions.value
+        description: dom.description.value, instructions: dom.instructions.value,
+        model: dom.model.value,
+        enabledTools: core.AVAILABLE_TOOLS.filter(name => $("tool-" + name).checked)
       }, old ? { id: old.id, createdAt: old.createdAt } : undefined);
       if (!old && agents.length >= core.MAX_AGENTS) {
         throw new Error("Достигнут лимит в " + core.MAX_AGENTS + " агентов.");
@@ -229,6 +247,7 @@
   dom.importFile.addEventListener("change", importCatalog);
   dom.dialog.addEventListener("close", () => { editingId = null; });
 
+  window.AmayurenaWorkspace.init(() => navigate("agents"));
   agents = readCatalog();
   navigate(location.hash.slice(1));
   refresh();

@@ -62,3 +62,29 @@ test("search matches name, role, description and ignores case", () => {
   assert.equal(filterAgents(agents, "отчёты").length, 1);
   assert.equal(filterAgents(agents, "").length, 2);
 });
+
+test("agent backup keeps selected model and tool permissions", () => {
+  const agent = normalizeAgent({
+    name: "Счётчик", model: "endpoint-selected",
+    enabledTools: ["calculate", "text_statistics"]
+  }, { id: "agent-model", now: "2026-10-28T00:00:00.000Z" });
+  const restored = parseBackup(makeBackup([agent]))[0];
+  assert.equal(restored.model, "endpoint-selected");
+  assert.deepEqual(restored.enabledTools, ["calculate", "text_statistics"]);
+});
+
+test("old v1 backup imports with empty model and disabled tools", () => {
+  const old = {
+    version: 1, agents: [{ id: "legacy-01", name: "Старый агент",
+      role: "Архивариус", description: "", instructions: "",
+      createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-02T00:00:00Z" }]
+  };
+  const agent = parseBackup(JSON.stringify(old))[0];
+  assert.equal(agent.model, "");
+  assert.deepEqual(agent.enabledTools, []);
+});
+
+test("agent does not accept unknown tools or malformed model", () => {
+  assert.throws(() => normalizeAgent({ name: "Агент", enabledTools: ["shell"] }), /инструмент/);
+  assert.throws(() => normalizeAgent({ name: "Агент", model: " bad model " }), /модели/);
+});
