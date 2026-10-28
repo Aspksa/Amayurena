@@ -86,3 +86,35 @@ test("serves avatar scripts, styles and fallback art without exposing arbitrary 
     assert.equal((await fetch(base + "/assets/avatars/../../server.js")).status, 404);
   });
 });
+
+test("installs ten avatar images via local ZIP upload and serves installed WebP", async () => {
+  const fs = require("node:fs");
+  const os = require("node:os");
+  const path = require("node:path");
+  const { makeZip } = require("./helpers/zip-builder.cjs");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "amayurena-api-avatar-"));
+  try {
+    await withServer({ env: {}, avatarDirectory: root }, async base => {
+      const blocked = await fetch(base + "/api/avatar/install", {
+        method: "POST", headers: { "Content-Type": "text/plain" }, body: "bad archive"
+      });
+      assert.equal(blocked.status, 415);
+      const foreign = await fetch(base + "/api/avatar/install", {
+        method: "POST", headers: { "Origin": "https://evil.test", "Content-Type": "application/zip" },
+        body: makeZip()
+      });
+      assert.equal(foreign.status, 403);
+      const response = await fetch(base + "/api/avatar/install", {
+        method: "POST", headers: { "Content-Type": "application/zip" }, body: makeZip()
+      });
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { installed: 10, directory: "assets/avatars" });
+      const image = await fetch(base + "/assets/avatars/pose-01.webp");
+      assert.equal(image.status, 200);
+      assert.match(image.headers.get("content-type"), /image\\/webp/);
+      assert.ok((await image.arrayBuffer()).byteLength > 16);
+      const wrong = await fetch(base + "/assets/avatars/pose-11.webp");
+      assert.equal(wrong.status, 404);
+    });
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
