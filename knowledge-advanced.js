@@ -424,9 +424,8 @@
     basesStatus("Сохранение свойства…");
     try {
       await config.callbacks.beforeRestore();
-      const original=await api(query("/api/knowledge/note","path",row.path));
       const result=await api("/api/knowledge/bases/property",{
-        path:row.path,key,type,value,expectedSha:original.sha
+        path:row.path,key,type,value,expectedSha:row.sha
       });
       if (config.active===row.path) await config.callbacks.onReload(row.path);
       await loadBases();
