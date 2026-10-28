@@ -289,6 +289,14 @@
                 </select>
               </label>
             </div>
+            <div class="knowledge-map-catalog-controls">
+              <label for="knowledge-map-folder">Кластер папки:</label>
+              <select id="knowledge-map-folder"><option value="">Все папки</option></select>
+              <button id="knowledge-map-prev" type="button" class="btn btn-soft">← Назад</button>
+              <span id="knowledge-map-page" role="status">Страница 1</span>
+              <button id="knowledge-map-next" type="button" class="btn btn-soft">Далее →</button>
+              <span id="knowledge-map-count"></span>
+            </div>
             <div class="knowledge-insights-layout">
               <div class="knowledge-insights-graph-wrap">
                 <svg id="knowledge-insights-graph" viewBox="0 0 960 620" role="img" aria-label="Сеть заметок с проверенными и предлагаемыми связями"></svg>
@@ -297,6 +305,7 @@
               <aside class="knowledge-insights-detail" aria-label="Объяснение связей">
                 <h4 id="knowledge-insights-detail-title">Выберите заметку</h4>
                 <div id="knowledge-insights-detail-body"><p>Здесь появятся происхождение связей, связанные доски и предложения.</p></div>
+                <div id="knowledge-map-timeline" class="knowledge-map-timeline" aria-live="polite"></div>
               </aside>
             </div>
             <div class="knowledge-insights-review">
