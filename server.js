@@ -229,7 +229,8 @@ function createServer(options = {}) {
       try {
         const q = new URL(req.url, "http://localhost").searchParams;
         if (req.method === "GET") return json(res, 200, knowledgeAdvanced.readCanvas(canvasRoot, q.get("name")));
-        if (req.method === "DELETE") return json(res, 200, knowledgeAdvanced.deleteCanvas(canvasRoot, q.get("name")));
+        if (req.method === "DELETE") return json(res, 200, knowledgeAdvanced.deleteCanvas(canvasRoot, q.get("name"),
+          q.has("expectedSha") ? q.get("expectedSha") : undefined));
         if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
         const body = await readJson(req);
         return json(res, 200, knowledgeAdvanced.saveCanvas(canvasRoot, body && body.name, body && body.board,
