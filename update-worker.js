@@ -65,6 +65,8 @@ async function update(fetchImpl=fetch,root=ROOT){
  const release=await latest(fetchImpl);
  if(!release)throw Error("В GitHub пока нет опубликованных релизов.");
  const info=core.releaseAsset(release,local);
+ const expected=process.argv.find(x=>x.startsWith("--expected-tag="));
+ if(expected && info.tag!==expected.slice("--expected-tag=".length))throw Error("Релиз изменился после подтверждения. Установка отменена.");
  if(!info.available)return {updated:false,reason:"Текущая версия уже не старее последнего релиза."};
  const zip=await download(info,fetchImpl);
  const files=core.unpack(zip);
