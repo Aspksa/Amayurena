@@ -21,6 +21,7 @@ const STATIC_FILES = Object.freeze({
   "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
   "/knowledge.css": ["knowledge.css", "text/css; charset=utf-8"],
   "/knowledge.js": ["knowledge.js", "text/javascript; charset=utf-8"],
+  "/knowledge-insights.js": ["knowledge-insights.js", "text/javascript; charset=utf-8"],
   "/knowledge-native.js": ["knowledge-native.js", "text/javascript; charset=utf-8"],
   "/knowledge-editor-tools.js": ["knowledge-editor-tools.js", "text/javascript; charset=utf-8"],
   "/knowledge-advanced.js": ["knowledge-advanced.js", "text/javascript; charset=utf-8"],
