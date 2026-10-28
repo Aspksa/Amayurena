@@ -64,3 +64,35 @@ test("client wiring provides multi-session search, diagnostics, and manual cance
  assert.match(workspace,/AbortController/);
  assert.match(html,/chat-sessions\.js/);
 });
+
+
+test("execution journal is bounded and only records a fixed non-secret metadata schema",()=>{
+ let book=helper.create(helper.empty(),"Диалог","a");
+ book=helper.recordEvent(book,"chat_ok",{
+   model:"test/model-1",elapsedMs:1350,inputTokens:25,outputTokens:64,
+   content:"PRIVATE PROMPT",apiKey:"SECRET API KEY",token:"CREDENTIAL"
+ });
+ assert.equal(book.log.length,1);
+ assert.equal(book.log[0].kind,"chat_ok");
+ assert.equal(book.log[0].model,"test/model-1");
+ assert.equal(book.log[0].inputTokens,25);
+ assert.equal(book.log[0].elapsedMs,1350);
+ assert.equal(JSON.stringify(book.log).includes("PRIVATE PROMPT"),false);
+ assert.equal(JSON.stringify(book.log).includes("SECRET API KEY"),false);
+ for(let i=0;i<120;i++)book=helper.recordEvent(book,"agent_disabled");
+ assert.equal(book.log.length,100);
+ assert.throws(()=>helper.recordEvent(book,"execute_arbitrary_code"));
+ const persisted=helper.store(memory(),"agent1");
+ persisted.save(book);
+ assert.equal(persisted.load().log.length,100);
+});
+test("agent journaling UI uses sanitized stored events",()=>{
+ const fs=require("node:fs"),path=require("node:path");
+ const workspace=fs.readFileSync(path.join(__dirname,"..","workspace.js"),"utf8");
+ const app=fs.readFileSync(path.join(__dirname,"..","app.js"),"utf8");
+ const html=fs.readFileSync(path.join(__dirname,"..","index.html"),"utf8");
+ assert.match(html,/id="workspace-execution-log"/);
+ assert.match(workspace,/recordExecution\(mode==="chat"/);
+ assert.match(workspace,/renderExecutionLog/);
+ assert.match(app,/recordEvent\(book,enabled\?"agent_enabled":"agent_disabled"/);
+});

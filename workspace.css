@@ -59,3 +59,10 @@ button:disabled { opacity: .5; cursor: not-allowed; transform: none !important; 
 .workspace-compose #workspace-chat-cancel {align-self:start}
 #workspace-usage,#workspace-diagnostics {overflow-wrap:anywhere;line-height:1.55}
 @media(max-width:740px){.workspace-dialog-controls{display:grid;grid-template-columns:1fr}.workspace-dialog-controls select,.workspace-dialog-controls input{max-width:none;width:100%}}
+
+
+.workspace-execution-log{display:grid;gap:5px;max-height:240px;overflow:auto;padding:8px;border:1px solid #ebdfce;border-radius:10px;background:#fffcf7}
+.workspace-execution-entry{display:grid;gap:3px;padding:8px 5px;border-bottom:1px solid #ede3d5}
+.workspace-execution-entry:last-child{border-bottom:0}
+.workspace-execution-entry strong{font-size:11px;color:#745b3a}
+.workspace-execution-entry small{font-size:10px;color:#948575;overflow-wrap:anywhere}

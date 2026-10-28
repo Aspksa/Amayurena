@@ -16,7 +16,7 @@
     chatSelect: $("workspace-chat-select"), newChat: $("workspace-new-chat"),
     deleteChat: $("workspace-delete-chat"), renameChat: $("workspace-rename-chat"),
     chatSearch: $("workspace-chat-search"), cancelChat: $("workspace-chat-cancel"),
-    usage: $("workspace-usage"), diagnostics: $("workspace-diagnostics"),
+    usage: $("workspace-usage"), diagnostics: $("workspace-diagnostics"), executionLog: $("workspace-execution-log"),
     taskHistory: $("workspace-task-history"), taskForm: $("workspace-task-form"),
     taskInput: $("workspace-task-input"), taskRun: $("workspace-task-run"),
     toolForm: $("workspace-tool-form"), toolSelect: $("workspace-tool-select"),
@@ -127,6 +127,42 @@
     const date = new Date(iso);
     return Number.isNaN(date.valueOf()) ? "" : date.toLocaleString("ru-RU");
   }
+  function renderExecutionLog(){
+    d.executionLog.replaceChildren();
+    const events=(chatBook?.log||[]).slice(-25).reverse();
+    if(!events.length){
+      d.executionLog.append(el("p","workspace-placeholder","Событий выполнения пока нет."));
+      return;
+    }
+    const labels={
+      agent_enabled:"Агент включён",agent_disabled:"Агент остановлен",
+      chat_ok:"Диалог: ответ получен",chat_error:"Диалог: ошибка",
+      chat_cancel:"Диалог: ожидание отменено",task_ok:"Задача завершена",
+      task_error:"Задача не завершена",tool_ok:"Инструмент выполнен",tool_error:"Ошибка инструмента"
+    };
+    for(const event of events){
+      const row=el("div","workspace-execution-entry");
+      row.append(el("strong","",labels[event.kind]||event.kind));
+      let details=time(event.at);
+      if(event.model)details+=" · "+event.model;
+      if(Number.isFinite(event.elapsedMs))details+=" · "+(event.elapsedMs/1000).toFixed(1)+" с";
+      if(Number.isFinite(event.inputTokens))details+=" · вход "+event.inputTokens+" токенов";
+      if(Number.isFinite(event.outputTokens))details+=" · выход "+event.outputTokens+" токенов";
+      if(event.tool)details+=" · "+(TOOL_LABELS[event.tool]||event.tool);
+      row.append(el("small","",details));
+      d.executionLog.append(row);
+    }
+  }
+  function recordExecution(kind,details={}){
+    if(!agent||!chatBook)return;
+    try{
+      chatBook=sessions.recordEvent(chatBook,kind,details);
+      storeBook(agent.id);
+      renderExecutionLog();
+    }catch(_){
+      error("Не удалось записать событие в локальный журнал.");
+    }
+  }
   function renderChat() {
     d.chatHistory.replaceChildren();
     if (!data.chat.length) d.chatHistory.append(el("p", "workspace-placeholder", "Здесь появится диалог с агентом."));
@@ -229,7 +265,7 @@
     d.meta.textContent = (config.role || "Универсальный") + " · Модель: " + (config.model || "endpoint-selected");
     d.chatInput.value = "";
     d.taskInput.value = "";
-    renderChat(); renderTasks(); renderTools();
+    renderChat(); renderTasks(); renderTools(); renderExecutionLog();
     setConnection("pending", "Проверка подключения…");
     setBusy(false);
     checkConnection(generation);
@@ -274,6 +310,10 @@
         renderTasks();
       }
       saveHistory(current.id, data);
+      recordExecution(mode==="chat"?"chat_ok":"task_ok",{
+        model:result.model,elapsedMs:Date.now()-started,
+        inputTokens:result.usage?.prompt_tokens,outputTokens:result.usage?.completion_tokens
+      });
       const elapsed=(Date.now()-started)/1000;
       const usage=result.usage;
       d.diagnostics.textContent="Модель: "+(result.model||current.model||"не указана")+
@@ -285,6 +325,9 @@
       inputElement.value = "";
     } catch (e) {
       if (token === generation) {
+        recordExecution(e.name==="AbortError"?"chat_cancel":(mode==="chat"?"chat_error":"task_error"),{
+          model:current.model,elapsedMs:Date.now()-started
+        });
         error(e.name==="AbortError"?"Ожидание ответа отменено пользователем. Серверный запрос может ещё выполняться.":(e.message||"Ошибка запуска."));
         d.diagnostics.textContent="Ошибка после "+((Date.now()-started)/1000).toFixed(1)+" с: "+(e.name||"ответ не получен");
       }
@@ -310,8 +353,11 @@
     setBusy(true); error("");
     try {
       const response = await requestJson("/api/tools", { name, args });
-      if (token === generation) d.toolResult.textContent = JSON.stringify(response.result, null, 2);
-    } catch (e) { if (token === generation) error(e.message); }
+      if (token === generation) {
+        d.toolResult.textContent = JSON.stringify(response.result, null, 2);
+        recordExecution("tool_ok",{tool:name});
+      }
+    } catch (e) { if (token === generation) { error(e.message);recordExecution("tool_error",{tool:name}); } }
     finally { if (token === generation) setBusy(false); }
   }
 

@@ -69,10 +69,25 @@ function append(data,id,messages){
  if(s.title==="Новый диалог"){const first=s.messages.find(x=>x.role==="user");if(first)s.title=first.content.slice(0,65);}
  return v;
 }
+const KINDS=new Set(["agent_enabled","agent_disabled","chat_ok","chat_error","task_ok","task_error","tool_ok","tool_error","chat_cancel"]);
+function recordEvent(data,kind,details={}){
+ if(!KINDS.has(kind))throw Error("Неизвестный тип события.");
+ const base=normalize(data);
+ const at=new Date().toISOString();
+ const safe={kind,at};
+ if(typeof details.model==="string")safe.model=details.model.slice(0,120).replace(/[^\w.\/:+-]/g,"");
+ if(Number.isFinite(details.elapsedMs))safe.elapsedMs=Math.max(0,Math.min(600000,Math.round(details.elapsedMs)));
+ if(Number.isSafeInteger(details.inputTokens)&&details.inputTokens>=0)safe.inputTokens=details.inputTokens;
+ if(Number.isSafeInteger(details.outputTokens)&&details.outputTokens>=0)safe.outputTokens=details.outputTokens;
+ if(typeof details.tool==="string")safe.tool=details.tool.slice(0,50).replace(/[^\w-]/g,"");
+ base.log.push(safe);
+ base.log=base.log.slice(-100);
+ return base;
+}
 function find(data,query){
  const q=String(query||"").trim().toLocaleLowerCase("ru");
  return normalize(data).sessions.map(s=>({...s,messages:q?s.messages.filter(m=>m.content.toLocaleLowerCase("ru").includes(q)):s.messages}))
   .filter(s=>!q||s.title.toLocaleLowerCase("ru").includes(q)||s.messages.length);
 }
-return {PREFIX,MAX_SESSIONS,MAX_MESSAGES,empty,normalize,store,create,remove,append,find,fromLegacy};
+return {PREFIX,MAX_SESSIONS,MAX_MESSAGES,empty,normalize,store,create,remove,append,find,fromLegacy,recordEvent};
 });
