@@ -287,7 +287,7 @@
         record.x=canvas.grid?layout.clamp(canvasExtra.snap(nx),0,movingGroup?layout.WIDTH-record.width:3200):nx;
         record.y=canvas.grid?layout.clamp(canvasExtra.snap(ny),0,movingGroup?layout.HEIGHT-record.height:2400):ny;
         moved=true;
-        const shiftX=nx-x,shiftY=ny-y;
+        const shiftX=record.x-x,shiftY=record.y-y;
         for (const member of members) {
           member.node.x=layout.clamp(member.x+shiftX,0,3200);
           member.node.y=layout.clamp(member.y+shiftY,0,2400);
