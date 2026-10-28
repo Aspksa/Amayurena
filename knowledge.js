@@ -408,6 +408,35 @@
       return false;
     }
   }
+  async function saveAsCopy() {
+    if (!active) return;
+    const from = active, value = ui.editor.value;
+    const suggested = from.replace(/\.md$/i, " - копия.md");
+    const raw = prompt("Куда сохранить отдельную копию заметки? Укажите новое имя файла:", suggested);
+    if (raw === null || !raw.trim()) return;
+    const to = raw.trim();
+    if (to === from) {
+      message("Для копии укажите новое имя файла.", true); return;
+    }
+    clearTimeout(saveTimer);
+    await queue;
+    try {
+      await post("/api/knowledge/note/create", { path: to, content: value });
+      if (active !== from || ui.editor.value !== value) {
+        message("Копия создана: " + to + ". Текущий черновик остался открытым.", true);
+        await refresh();
+        return;
+      }
+      await refresh();
+      const loaded = await openNote(to, true);
+      if (loaded) {
+        clearDraft(from, value);
+        message("Отдельная копия сохранена: " + to);
+      } else message("Копия создана: " + to + ". Переключение не выполнено.", true);
+    } catch (error) {
+      message("Копия не сохранена: " + error.message + ". Текст остался в редакторе.", true);
+    }
+  }
   function createError(text) {
     const target = $("knowledge-create-error");
     target.textContent = text;
@@ -768,6 +797,7 @@
       });
       window.addEventListener("online", () => { if (active && revision > committed) void saveNow(); });
       ui.save.addEventListener("click", () => { void saveNow(); });
+      $("knowledge-save-copy").addEventListener("click", () => { void saveAsCopy(); });
       ui.mode.addEventListener("click", () => setMode(ui.mode.dataset.current === "graph" ? "editor" : "graph"));
     }
     try {
