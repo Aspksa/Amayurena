@@ -51,9 +51,8 @@ test("ZIP extraction verifies required files, checksum, traversal, symlinks and 
  assert.throws(()=>core.unpack(makeZip(packageFiles().concat([{name:".env",content:Buffer.from("SECRET")}]))));
  assert.throws(()=>core.unpack(makeZip(packageFiles().concat([{name:"server.js",content:Buffer.from("duplicate")}]))));
  const corrupted=Buffer.from(zip);
- const locate=corrupted.indexOf(Buffer.from("New server"));
- assert.ok(locate>=0);
- corrupted[locate]^=1;
+ const dataAt=30+Buffer.byteLength("project-version.json");
+ corrupted[dataAt]^=1;
  assert.throws(()=>core.unpack(corrupted));
 });
 test("installer backs up and replaces only application files, never user data",()=>fixture(root=>{
