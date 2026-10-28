@@ -36,6 +36,8 @@ jobs:
           node --check knowledge-core.js
           node --check knowledge.js
           node --check tests/knowledge.test.cjs
+          node --check chat-sessions.js
+          node --check tests/chat-sessions.test.cjs
           node --check agents-core.js
           node --check app.js
           node --check workspace.js

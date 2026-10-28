@@ -102,13 +102,15 @@
     const header = element("div", "agent-card-top");
     const monogram = element("div", "agent-avatar", agent.name.slice(0, 1).toLocaleUpperCase("ru"));
     monogram.setAttribute("aria-hidden", "true");
-    header.append(monogram, element("span", "agent-status", "Конфигурация"));
+    header.append(monogram, element("span", "agent-status", agent.enabled===false ? "Остановлен" : "Готов к запуску"));
     card.append(header, element("h3", "agent-name", agent.name), element("div", "agent-role", agent.role));
     card.append(element("p", "agent-description", agent.description || "Описание пока не добавлено."));
     const footer = element("div", "agent-card-footer");
     const meta = element("span", "agent-date", "Изменён: " + new Date(agent.updatedAt).toLocaleDateString("ru-RU"));
     const actions = element("div", "card-actions");
     actions.append(
+      actionButton(agent.enabled===false?"Запустить":"Остановить", "btn btn-small btn-soft",
+        () => toggleAgent(agent.id), "Сменить состояние "+agent.name),
       actionButton("Открыть", "btn btn-small btn-primary", () => openWorkspace(agent.id), "Открыть " + agent.name),
       actionButton("Изменить", "btn btn-small btn-soft", () => openEditor(agent.id), "Изменить " + agent.name),
       actionButton("Удалить", "btn btn-small btn-danger", () => removeAgent(agent.id), "Удалить " + agent.name)
@@ -118,6 +120,16 @@
     return card;
   }
 
+  function toggleAgent(id) {
+    const current=agents.find(a=>a.id===id);
+    if(!current)return;
+    const enabled=current.enabled===false;
+    const next=agents.map(a=>a.id===id?{...a,enabled,updatedAt:new Date().toISOString()}:a);
+    if(saveCatalog(next)) {
+      if(!enabled)window.AmayurenaWorkspace.closeAgent();
+      showToast(enabled?"Агент включён для ручных запросов.":"Агент остановлен. Фоновые процессы не запускаются.");
+    }
+  }
   function refresh() {
     const visible = core.filterAgents(agents, dom.search.value);
     dom.homeCount.textContent = String(agents.length);
@@ -138,6 +150,7 @@
   function openWorkspace(id) {
     const selected = agents.find(item => item.id === id);
     if (!selected) return;
+    if(selected.enabled===false){showToast("Сначала включите агента.");return;}
     if (location.hash !== "#agents") history.replaceState(null, "", "#agents");
     navigate("agents");
     window.AmayurenaWorkspace.openAgent(selected);
@@ -157,6 +170,7 @@
     dom.description.value = agent ? agent.description : "";
     dom.instructions.value = agent ? agent.instructions : "";
     dom.model.value = agent ? (agent.model || "") : "";
+    $("agent-enabled").checked = !agent || agent.enabled !== false;
     for (const toolName of core.AVAILABLE_TOOLS) {
       $("tool-" + toolName).checked = !!agent && (agent.enabledTools || []).includes(toolName);
     }
@@ -178,7 +192,7 @@
       const draft = core.normalizeAgent({
         name: dom.name.value, role: dom.role.value,
         description: dom.description.value, instructions: dom.instructions.value,
-        model: dom.model.value,
+        model: dom.model.value, enabled: $("agent-enabled").checked,
         enabledTools: core.AVAILABLE_TOOLS.filter(name => $("tool-" + name).checked)
       }, old ? { id: old.id, createdAt: old.createdAt } : undefined);
       if (!old && agents.length >= core.MAX_AGENTS) {

@@ -35,6 +35,7 @@ const STATIC_FILES = Object.freeze({
   "/assets/avatars/sprite.avif": [path.join("assets", "avatars", "sprite.avif"), "image/avif"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/agents-core.js": ["agents-core.js", "text/javascript; charset=utf-8"],
+  "/chat-sessions.js": ["chat-sessions.js", "text/javascript; charset=utf-8"],
   "/workspace.js": ["workspace.js", "text/javascript; charset=utf-8"]
 });
 const MAX_BODY_BYTES = 128 * 1024;
