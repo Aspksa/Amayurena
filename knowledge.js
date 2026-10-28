@@ -813,8 +813,10 @@
     await window.AmayurenaKnowledgeAdvanced.savePending();
   }
   async function reloadInsightsSource(path) {
-    if(active===path) await openNote(path,true);
-    else await refresh();
+    if(active===path) {
+      await openNote(path,true);
+      window.AmayurenaKnowledgeAdvanced.show("insights");
+    } else await refresh();
   }
   window.AmayurenaKnowledge = { open, openNote, beforeInsightsWrite, reloadInsightsSource };
 })();
