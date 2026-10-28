@@ -12,13 +12,62 @@
     return typeof url === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(url) && url.length < 1200000;
   }
   const assets = paths.map((path, i) => isValidDataUrl(saved[i]) ? saved[i] : path);
+  // Eight unique frames correspond to ten selectable poses; 6 repeats 1, 7 repeats 5.
+  // This compact atlas is bundled with the app. If full-size WebP is installed later,
+  // the full-size image takes precedence. Browser-specific uploads take highest priority.
+  const atlasMap = Object.freeze([0, 1, 2, 3, 4, 0, 4, 5, 6, 7]);
+  const spriteUrl = "./assets/avatars/sprite.avif";
+  const frameSize = 192;
+  let spritePromise = null;
+
+  function loadEmbeddedPoses() {
+    if (spritePromise) return spritePromise;
+    spritePromise = new Promise((resolve, reject) => {
+      const atlas = new Image();
+      atlas.onload = () => {
+        try {
+          if (atlas.naturalWidth !== frameSize * 4 || atlas.naturalHeight !== frameSize * 2) {
+            throw new Error("Неверный размер встроенного набора аватаров.");
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = frameSize;
+          canvas.height = frameSize;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Не удалось отобразить встроенные изображения.");
+          const frames = [];
+          for (let i = 0; i < 10; i++) {
+            const cell = atlasMap[i];
+            ctx.clearRect(0, 0, frameSize, frameSize);
+            ctx.drawImage(atlas, (cell % 4) * frameSize, Math.floor(cell / 4) * frameSize,
+              frameSize, frameSize, 0, 0, frameSize, frameSize);
+            frames.push(canvas.toDataURL("image/png"));
+          }
+          resolve(frames);
+        } catch (error) { reject(error); }
+      };
+      atlas.onerror = () => reject(new Error("Встроенный набор изображений недоступен."));
+      atlas.src = spriteUrl;
+    });
+    return spritePromise;
+  }
+
   function fallbackToPlaceholder(element) {
     element.onerror = null;
     element.src = fallback;
   }
   function ensureImage(element, index) {
-    element.onerror = () => fallbackToPlaceholder(element);
-    element.src = assets[index] || fallback;
+    const path = assets[index] || fallback;
+    element.onerror = () => {
+      element.onerror = null;
+      loadEmbeddedPoses().then(frames => {
+        if (element.getAttribute("src") !== path) return; // Selection changed while loading.
+        element.onerror = () => fallbackToPlaceholder(element);
+        element.src = frames[index] || fallback;
+      }).catch(() => {
+        if (element.getAttribute("src") === path) fallbackToPlaceholder(element);
+      });
+    };
+    element.src = path;
   }
   async function importImage(file, index) {
     if (!file || !["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 12 * 1024 * 1024) {
@@ -53,5 +102,5 @@
     for (let i = 0; i < assets.length; i++) assets[i] = paths[i] + "?updated=" + now;
   }
   window.AmayurenaAvatarAssets = assets;
-  window.AmayurenaAvatarAssetsApi = { importImage, ensureImage, reloadInstalled, fallback, paths };
+  window.AmayurenaAvatarAssetsApi = { importImage, ensureImage, reloadInstalled, loadEmbeddedPoses, fallback, paths, spriteUrl };
 })();
