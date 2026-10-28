@@ -4,8 +4,8 @@
   const TOOL_LABELS = {
     text_statistics: "Статистика текста", calculate: "Калькулятор", current_time_utc: "Время UTC"
   };
-  const HISTORY_PREFIX = "amayurena.workspace.v1.";
-  const MAX_CHAT = 40, MAX_TASKS = 30;
+  const sessions = window.AmayurenaSessions;
+  const MAX_CHAT = sessions.MAX_MESSAGES, MAX_TASKS = 30;
   const d = {
     catalog: $("agent-catalog-panel"), view: $("agent-workspace"),
     back: $("workspace-back"), name: $("workspace-name"), meta: $("workspace-meta"),
@@ -13,6 +13,10 @@
     chatHistory: $("workspace-chat-history"), chatForm: $("workspace-chat-form"),
     chatInput: $("workspace-chat-input"), chatSend: $("workspace-chat-send"),
     clearChat: $("workspace-clear-chat"),
+    chatSelect: $("workspace-chat-select"), newChat: $("workspace-new-chat"),
+    deleteChat: $("workspace-delete-chat"), renameChat: $("workspace-rename-chat"),
+    chatSearch: $("workspace-chat-search"), cancelChat: $("workspace-chat-cancel"),
+    usage: $("workspace-usage"), diagnostics: $("workspace-diagnostics"),
     taskHistory: $("workspace-task-history"), taskForm: $("workspace-task-form"),
     taskInput: $("workspace-task-input"), taskRun: $("workspace-task-run"),
     toolForm: $("workspace-tool-form"), toolSelect: $("workspace-tool-select"),
@@ -28,6 +32,8 @@
   let configured = false;
   let generation = 0;
   let onBack = () => {};
+  let chatBook = null;
+  let activeRequest = null;
 
   function el(tag, cls, value) {
     const node = document.createElement(tag);
@@ -40,34 +46,82 @@
     d.connection.dataset.state = state;
     d.connection.textContent = text;
   }
-  function key(id) { return HISTORY_PREFIX + id; }
-  function validChat(m) {
-    return m && ["user", "assistant"].includes(m.role) && typeof m.content === "string" &&
-      m.content.length <= 16000 && typeof m.at === "string";
-  }
-  function validTask(t) {
-    return t && typeof t.input === "string" && t.input.length <= 12000 &&
-      typeof t.reply === "string" && t.reply.length <= 16000 &&
-      typeof t.at === "string";
+  function activeSession() {return chatBook?.sessions.find(x=>x.id===chatBook.current);}
+  function storeBook(id) {
+    const current=activeSession();
+    if(current)current.messages=data.chat.slice(-MAX_CHAT);
+    chatBook.tasks=data.tasks.slice(-MAX_TASKS);
+    try {
+      chatBook=sessions.store(localStorage,id).save(chatBook);
+      return true;
+    }catch(_){
+      error("Не удалось сохранить диалоги. Проверьте место в хранилище браузера.");
+      return false;
+    }
   }
   function loadHistory(id) {
     try {
-      const parsed = JSON.parse(localStorage.getItem(key(id)) || "{}");
-      return { chat: Array.isArray(parsed.chat) ? parsed.chat.filter(validChat).slice(-MAX_CHAT) : [],
-        tasks: Array.isArray(parsed.tasks) ? parsed.tasks.filter(validTask).slice(-MAX_TASKS) : [] };
-    } catch (_) {
-      error("Не удалось прочитать историю в этом браузере.");
-      return { chat: [], tasks: [] };
+      chatBook=sessions.store(localStorage,id).load();
+      if(!chatBook.current) {
+        chatBook=sessions.create(chatBook,"Новый диалог", "chat_"+Date.now().toString(36));
+      }
+      const current=activeSession();
+      return {chat:current?.messages.slice(-MAX_CHAT)||[],tasks:chatBook.tasks.slice(-MAX_TASKS)};
+    }catch(e){
+      error("История диалогов недоступна: "+e.message);
+      chatBook=sessions.create(sessions.empty(),"Новый диалог","chat_"+Date.now().toString(36));
+      return {chat:[],tasks:[]};
     }
   }
-  function saveHistory(id, next) {
-    try {
-      localStorage.setItem(key(id), JSON.stringify(next));
-      return true;
-    } catch (_) {
-      error("Не удалось сохранить историю. Проверьте доступ к локальному хранилищу или освободите место.");
-      return false;
+  function saveHistory(id,next) {
+    data=next;
+    return storeBook(id);
+  }
+  function renderDialogs() {
+    d.chatSelect.replaceChildren();
+    for(const entry of chatBook?.sessions||[]){
+      const option=el("option","",entry.title);
+      option.value=entry.id;
+      d.chatSelect.append(option);
     }
+    d.chatSelect.value=chatBook?.current||"";
+    d.deleteChat.disabled=busy||!chatBook?.current;
+    d.renameChat.disabled=busy||!chatBook?.current;
+  }
+  function selectSession(id){
+    if(!agent||busy||!chatBook?.sessions.some(s=>s.id===id))return;
+    storeBook(agent.id);
+    chatBook.current=id;
+    data.chat=activeSession().messages.slice();
+    d.chatSearch.value="";
+    storeBook(agent.id);
+    renderDialogs();renderChat();
+  }
+  function newSession(){
+    if(!agent||busy)return;
+    storeBook(agent.id);
+    try{
+      chatBook=sessions.create(chatBook,"Новый диалог","chat_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,6));
+      data.chat=[];
+      storeBook(agent.id);renderDialogs();renderChat();
+    }catch(e){error(e.message);}
+  }
+  function deleteSession(){
+    if(!agent||busy||!chatBook?.current||!confirm("Удалить текущий диалог без возможности восстановления?"))return;
+    chatBook=sessions.remove(chatBook,chatBook.current);
+    if(!chatBook.current) chatBook=sessions.create(chatBook,"Новый диалог","chat_"+Date.now().toString(36));
+    data.chat=activeSession().messages.slice();
+    storeBook(agent.id);renderDialogs();renderChat();
+  }
+  function renameSession(){
+    if(!agent||busy)return;
+    const current=activeSession();
+    if(!current)return;
+    const title=prompt("Название диалога:",current.title);
+    if(title===null)return;
+    if(!title.trim()||title.trim().length>80){error("Имя диалога: от 1 до 80 символов.");return;}
+    current.title=title.trim();
+    storeBook(agent.id);renderDialogs();
   }
   function time(iso) {
     const date = new Date(iso);
@@ -76,7 +130,8 @@
   function renderChat() {
     d.chatHistory.replaceChildren();
     if (!data.chat.length) d.chatHistory.append(el("p", "workspace-placeholder", "Здесь появится диалог с агентом."));
-    for (const msg of data.chat) {
+    const phrase=d.chatSearch.value.trim().toLocaleLowerCase("ru");
+    for (const msg of data.chat.filter(m=>!phrase||m.content.toLocaleLowerCase("ru").includes(phrase))) {
       const item = el("div", "message message-" + msg.role);
       item.append(el("strong", "message-sender", msg.role === "user" ? "Вы" : agent.name));
       item.append(el("p", "message-body", msg.content));
@@ -121,11 +176,16 @@
     d.taskRun.disabled = value || !configured;
     d.toolRun.disabled = value;
     d.clearChat.disabled = value;
+    d.cancelChat.hidden = !value;
+    d.chatSelect.disabled=value;
+    d.newChat.disabled=value;
+    d.deleteChat.disabled=value;
+    d.renameChat.disabled=value;
   }
-  async function requestJson(endpoint, body) {
+  async function requestJson(endpoint, body, signal) {
     const response = await fetch(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body), signal
     });
     let result;
     try { result = await response.json(); }
@@ -159,6 +219,10 @@
     busy = false;
     error("");
     data = loadHistory(config.id);
+    renderDialogs();
+    d.chatSearch.value="";
+    d.diagnostics.textContent="Для новой сессии пока нет запросов.";
+    d.usage.textContent="Расходы в валюте не вычисляются без подтверждённого тарифа Cloud.ru.";
     d.catalog.hidden = true;
     d.view.hidden = false;
     d.name.textContent = config.name;
@@ -179,7 +243,7 @@
     configured = false;
   }
   async function submit(mode, inputElement) {
-    if (!agent || busy || !configured) return;
+    if (!agent || busy || !configured || agent.enabled===false) return;
     const prompt = inputElement.value.trim();
     if (!prompt || prompt.length > 12000) { error("Введите сообщение или задачу длиной до 12000 символов."); return; }
     const current = agent;
@@ -187,6 +251,9 @@
     const history = mode === "chat"
       ? data.chat.slice(-16).map(m => ({ role: m.role, content: m.content.slice(0, 12000) })) : [];
     setBusy(true);
+    const started=Date.now();
+    const controller=new AbortController();
+    activeRequest=controller;
     error("");
     setConnection("pending", "Модель отвечает…");
     try {
@@ -194,7 +261,7 @@
         agent: { name: current.name, role: current.role, instructions: current.instructions,
           model: current.model || "", enabledTools: current.enabledTools || [] },
         mode, input: prompt, history
-      });
+      },controller.signal);
       if (token !== generation || !agent || agent.id !== current.id) return;
       const at = new Date().toISOString();
       if (mode === "chat") {
@@ -207,10 +274,22 @@
         renderTasks();
       }
       saveHistory(current.id, data);
+      const elapsed=(Date.now()-started)/1000;
+      const usage=result.usage;
+      d.diagnostics.textContent="Модель: "+(result.model||current.model||"не указана")+
+        " · ответ за "+elapsed.toFixed(1)+" с · инструменты: "+(result.toolsUsed?.length||0);
+      d.usage.textContent=usage?
+        "Токены по данным провайдера: вход "+usage.prompt_tokens+", выход "+usage.completion_tokens+
+          ". Денежная стоимость не рассчитана (нет тарифа).":
+        "Cloud.ru не вернул токены; стоимость вычислить невозможно.";
       inputElement.value = "";
     } catch (e) {
-      if (token === generation) error(e.message || "Ошибка запуска.");
+      if (token === generation) {
+        error(e.name==="AbortError"?"Ожидание ответа отменено пользователем. Серверный запрос может ещё выполняться.":(e.message||"Ошибка запуска."));
+        d.diagnostics.textContent="Ошибка после "+((Date.now()-started)/1000).toFixed(1)+" с: "+(e.name||"ответ не получен");
+      }
     } finally {
+      if(activeRequest===controller)activeRequest=null;
       if (token === generation) {
         setConnection(configured ? "ready" : "offline", configured ? "Cloud.ru настроен" : "Cloud.ru не настроен");
         setBusy(false);
@@ -243,6 +322,12 @@
     d.taskForm.addEventListener("submit", event => { event.preventDefault(); submit("task", d.taskInput); });
     d.toolForm.addEventListener("submit", event => { event.preventDefault(); runTool(); });
     d.toolSelect.addEventListener("change", updateToolFields);
+    d.chatSelect.addEventListener("change",e=>selectSession(e.target.value));
+    d.newChat.addEventListener("click",newSession);
+    d.deleteChat.addEventListener("click",deleteSession);
+    d.renameChat.addEventListener("click",renameSession);
+    d.chatSearch.addEventListener("input",renderChat);
+    d.cancelChat.addEventListener("click",()=>{activeRequest?.abort();});
     d.clearChat.addEventListener("click", () => {
       if (!agent || busy || !data.chat.length || !confirm("Очистить диалог этого агента?")) return;
       const next = { ...data, chat: [] };
