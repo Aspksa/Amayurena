@@ -93,7 +93,7 @@
   function render() {
     const selected = AVATARS[state.pose];
     const assets = window.AmayurenaAvatarAssets || [];
-    image.src = typeof assets[state.pose] === "string" ? assets[state.pose] : "";
+    window.AmayurenaAvatarAssetsApi.ensureImage(image, state.pose);
     image.alt = "Амаюрэна — " + selected[0];
     trigger.title = "Амаюрэна: левый клик — меню, правый — настройки; перетащите для перемещения";
     trigger.setAttribute("aria-label", "Амаюрэна. Открыть быстрое меню");
@@ -135,8 +135,8 @@
   }
   function navigateTo(page) {
     hideMenus();
-    window.location.hash = page;
-    window.dispatchEvent(new CustomEvent("amayurena:avatar-action", { detail: { action: page } }));
+    window.location.hash = page === "agents-chat" ? "agents" : page;
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("amayurena:avatar-action", { detail: { action: page } })), 0);
   }
   function openSettings(tab) {
     hideMenus();
@@ -159,7 +159,7 @@
   function preview() {
     const assets = window.AmayurenaAvatarAssets || [];
     const p = document.getElementById("am-avatar-preview-img");
-    p.src = assets[draft.pose] || "";
+    window.AmayurenaAvatarAssetsApi.ensureImage(p, draft.pose);
     p.alt = AVATARS[draft.pose][0];
     const frame = document.getElementById("am-avatar-preview");
     frame.className = "am-settings-preview am-anim-" + draft.animation;
@@ -177,7 +177,7 @@
       item.dataset.amPose = String(i);
       item.setAttribute("aria-label", "Выбрать: " + label);
       const thumbnail = node("img");
-      thumbnail.src = assets[i] || "";
+      window.AmayurenaAvatarAssetsApi.ensureImage(thumbnail, i);
       thumbnail.alt = "";
       thumbnail.loading = "lazy";
       item.append(thumbnail, node("span", "", label));
@@ -251,6 +251,36 @@
         size.id = "am-avatar-size";
         sizeLabel.append(sizeOutput, size);
         panel.append(sizeLabel);
+        const uploader = node("div", "am-upload-row");
+        const uploadButton = button("Загрузить свои изображения", () => uploadInput.click(), "am-secondary");
+        const uploadInput = node("input");
+        uploadInput.type = "file";
+        uploadInput.accept = "image/png,image/jpeg,image/webp";
+        uploadInput.multiple = true;
+        uploadInput.hidden = true;
+        uploadInput.setAttribute("aria-label", "Загрузить до десяти изображений аватара");
+        const uploadHelp = node("p", "am-help-text", "Один файл заменит выбранную позу. Несколько файлов заполнят позиции по порядку. Изображения сохраняются в браузере.");
+        const uploadStatus = node("p", "am-upload-status", "");
+        uploadStatus.setAttribute("role", "status");
+        uploadInput.addEventListener("change", async () => {
+          const files = [...uploadInput.files].slice(0, 10);
+          uploadInput.value = "";
+          if (!files.length) return;
+          uploadButton.disabled = true;
+          uploadStatus.textContent = "Подготовка изображений…";
+          try {
+            for (let i = 0; i < files.length; i++) {
+              await window.AmayurenaAvatarAssetsApi.importImage(files[i], files.length === 1 ? draft.pose : i);
+            }
+            uploadStatus.textContent = "Сохранено: " + files.length + " изображений.";
+            buildSettings();
+            render();
+          } catch (error) {
+            uploadStatus.textContent = "Ошибка: " + error.message;
+          } finally { uploadButton.disabled = false; }
+        });
+        uploader.append(uploadButton, uploadInput, uploadHelp, uploadStatus);
+        panel.append(uploader);
       }
       left.append(panel);
     }
