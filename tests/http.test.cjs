@@ -64,3 +64,13 @@ test("chat returns clear configuration error when Cloud.ru is not configured", a
     assert.match((await response.json()).error, /Cloud.ru/);
   });
 });
+
+test("limits API request body to 128 KiB and returns 413", async () => {
+  await withServer({ env: {} }, async base => {
+    const response = await fetch(base + "/api/tools", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "text_statistics", args: { text: "a".repeat(140000) } })
+    });
+    assert.equal(response.status, 413);
+  });
+});
