@@ -773,7 +773,7 @@
     try {
       await refresh();
       if (!active && workspace.state.tabs.length) await openNote(workspace.state.tabs.at(-1));
-      message("База знаний доступна локально.");
+      if (revision <= committed) message("База знаний доступна локально.");
     }
     catch (error) { message("Не удалось открыть хранилище: " + error.message, true); }
   }
