@@ -24,6 +24,7 @@
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge-insights.js"></script>
   <script defer src="./knowledge.js"></script>
+  <script defer src="./update-ui.js"></script>
   <script defer src="./app.js"></script>
   <script defer src="./avatar-assets.js"></script>
   <script defer src="./avatar.js"></script>
@@ -48,7 +49,7 @@
         </button>
       </nav>
       <p class="sidebar-note">Агенты хранятся локально в этом браузере. Создайте резервную копию для переноса.</p>
-      <div class="sidebar-bottom">AMAYURENA <span>v0.2.0</span></div>
+      <div class="sidebar-bottom">AMAYURENA <span>v0.18.0</span></div>
     </aside>
 
     <main class="main">
@@ -56,6 +57,11 @@
         <div>
           <div class="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</div>
           <h1 id="page-title">Главная</h1>
+        </div>
+        <div class="topbar-update">
+          <button id="update-check" class="btn btn-soft" type="button">Проверить обновления</button>
+          <button id="update-install" class="btn btn-primary" type="button" hidden>Проверить и установить</button>
+          <span id="update-status" role="status" aria-live="polite">Обновления из официальных релизов GitHub.</span>
         </div>
         <div class="topbar-mark" aria-hidden="true">✦</div>
       </header>
