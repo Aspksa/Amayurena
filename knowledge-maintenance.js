@@ -77,7 +77,10 @@ function trashNote(spec, requested) {
     advanced.deleteNote(spec.notesRoot, spec.historyRoot, note.path);
     attachments.detach(attachDir,note.path,id);
   } catch (error) {
-    if(fs.existsSync(entryFile(spec.trashRoot,id)))fs.unlinkSync(entryFile(spec.trashRoot,id));
+    // Never discard the only recoverable copy after the note was already deleted.
+    let intact=false;
+    try { core.read(spec.notesRoot,note.path); intact=true; } catch(_){}
+    if(intact&&fs.existsSync(entryFile(spec.trashRoot,id)))fs.unlinkSync(entryFile(spec.trashRoot,id));
     throw error;
   }
   return { id, path: note.path, deletedAt: entry.deletedAt };
