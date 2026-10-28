@@ -19,6 +19,7 @@
   <script defer src="./knowledge-document-outline.js"></script>
   <script defer src="./knowledge-markdown.js"></script>
   <script defer src="./knowledge-canvas-layout.js"></script>
+  <script defer src="./knowledge-canvas-enhance.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge-insights.js"></script>
   <script defer src="./knowledge.js"></script>
@@ -316,11 +317,22 @@
             <div class="knowledge-advanced-toolbar">
               <label class="sr-only" for="knowledge-canvas-select">Выбор доски</label>
               <select id="knowledge-canvas-select" aria-label="Выберите доску"></select>
+              <label class="sr-only" for="knowledge-canvas-template">Шаблон новой доски</label>
+              <select id="knowledge-canvas-template" title="Шаблон новой доски">
+                <option value="blank">Пустая доска</option>
+                <option value="mind">Карта идей</option>
+                <option value="kanban">Три этапа</option>
+              </select>
               <button id="knowledge-canvas-new" class="btn btn-primary" type="button">＋ Доска</button>
               <button id="knowledge-canvas-text" class="btn btn-soft" type="button">＋ Текст</button>
               <button id="knowledge-canvas-file" class="btn btn-soft" type="button">＋ Заметка</button>
               <button id="knowledge-canvas-group" class="btn btn-soft" type="button">＋ Группа</button>
               <button id="knowledge-canvas-layout" class="btn btn-soft" type="button">Упорядочить</button>
+              <button id="knowledge-canvas-undo" class="btn btn-soft" type="button" title="Отменить изменение" disabled>↶ Отменить</button>
+              <button id="knowledge-canvas-redo" class="btn btn-soft" type="button" title="Повторить изменение" disabled>↷ Повторить</button>
+              <button id="knowledge-canvas-select-all" class="btn btn-soft" type="button">Выделить всё</button>
+              <button id="knowledge-canvas-copy" class="btn btn-soft" type="button">Копировать выбранное</button>
+              <button id="knowledge-canvas-snap" class="btn btn-soft" type="button" aria-pressed="false">Сетка: выкл.</button>
               <button id="knowledge-canvas-save" class="btn btn-soft" type="button">Сохранить</button>
               <button id="knowledge-canvas-delete" class="btn btn-danger" type="button">Удалить доску</button>
             </div>
