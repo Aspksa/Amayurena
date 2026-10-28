@@ -670,6 +670,26 @@
     } catch (e) { $("knowledge-backup-status").textContent = "Ошибка: " + e.message; }
     finally { button.disabled = false; }
   }
+  function formatEditor(action) {
+    if (!active) return;
+    const editor = ui.editor;
+    try {
+      const result = window.AmayurenaEditorTools.formatSelection(editor.value,
+        editor.selectionStart, editor.selectionEnd, action);
+      editor.value = result.content;
+      editor.focus();
+      editor.setSelectionRange(result.start, result.end);
+      scheduleSave();
+    } catch (err) { message(err.message, true); }
+  }
+  function focusSearch() {
+    const search = ui.search;
+    search.focus();
+    search.select();
+    if (window.matchMedia && window.matchMedia("(max-width: 740px)").matches) {
+      search.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
   function setMode(mode) {
     const isGraph = mode === "graph";
     ui.panel.hidden = isGraph || !active;
@@ -692,6 +712,34 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void saveNow(); }
       });
       ui.search.addEventListener("input", () => { renderTree(); scheduleSearch(); });
+      $("knowledge-favorite").addEventListener("click", () => {
+        if (!active) return;
+        workspace.favorite(active); renderTree(); renderTabs(); updateActions();
+      });
+      $("knowledge-pin").addEventListener("click", () => {
+        if (!active) return;
+        workspace.pin(active); renderTree(); renderTabs(); updateActions();
+      });
+      $("knowledge-tab-close").addEventListener("click", () => { if (active) void closeTab(active); });
+      $("knowledge-format-toolbar").addEventListener("click", event => {
+        const button = event.target.closest("[data-format]");
+        if (button) formatEditor(button.dataset.format);
+      });
+      document.addEventListener("keydown", event => {
+        if (!(event.ctrlKey || event.metaKey)) return;
+        const key = event.key.toLowerCase();
+        if (key === "k") { event.preventDefault(); focusSearch(); }
+        else if (key === "tab" && workspace.state.tabs.length > 1) {
+          event.preventDefault();
+          const index = workspace.state.tabs.indexOf(active);
+          const delta = event.shiftKey ? -1 : 1;
+          const next = workspace.state.tabs[(index + delta + workspace.state.tabs.length) % workspace.state.tabs.length];
+          if (next) void openNote(next);
+        } else if (event.target === ui.editor) {
+          if (key === "b") { event.preventDefault(); formatEditor("bold"); }
+          if (key === "i") { event.preventDefault(); formatEditor("italic"); }
+        }
+      });
       ui.create.addEventListener("click", openCreateDialog);
       ui.folder.addEventListener("click", openFolderDialog);
       $("knowledge-create-form").addEventListener("submit", event => { void submitCreate(event); });
