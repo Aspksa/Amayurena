@@ -12,6 +12,7 @@ const knowledgeAdvanced = require("./knowledge-advanced-core");
 const knowledgeMaintenance = require("./knowledge-maintenance");
 const knowledgeBases = require("./knowledge-bases-core");
 const knowledgeInsights = require("./knowledge-insights-core");
+const updater = require("./update-worker");
 const knowledgeMapCatalog = require("./knowledge-map-catalog");
 
 const BASE_DIR = __dirname;
@@ -38,6 +39,7 @@ const STATIC_FILES = Object.freeze({
   "/avatar-default.svg": ["avatar-default.svg", "image/svg+xml"],
   "/assets/avatars/sprite.avif": [path.join("assets", "avatars", "sprite.avif"), "image/avif"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/update-ui.js": ["update-ui.js", "text/javascript; charset=utf-8"],
   "/agents-core.js": ["agents-core.js", "text/javascript; charset=utf-8"],
   "/chat-sessions.js": ["chat-sessions.js", "text/javascript; charset=utf-8"],
   "/workspace.js": ["workspace.js", "text/javascript; charset=utf-8"]
@@ -107,7 +109,7 @@ function createServer(options = {}) {
     trashRoot: path.join(maintenanceRoot, "trash"), backupsRoot: path.join(maintenanceRoot, "backups") };
   let busy = 0;
   let avatarPublishing = false;
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("X-Frame-Options", "DENY");
@@ -124,6 +126,39 @@ function createServer(options = {}) {
       if (originHost !== host) return json(res, 403, { error: "Запрещён сторонний запрос." });
     }
     const pathname = (req.url || "").split("?")[0];
+    if(req.method==="GET"&&pathname==="/api/update/check"){
+      try{
+        return json(res,200,await updater.check(options.updateFetchImpl||fetch,BASE_DIR));
+      }catch(e){return json(res,503,{error:"Не удалось проверить обновление: "+e.message});}
+    }
+    if(req.method==="POST"&&pathname==="/api/update/install"){
+      if(process.platform!=="win32"||require.main!==module||env.AMAYURENA_NO_SELF_UPDATE==="1")
+        return json(res,501,{error:"Автоустановка доступна только в локальном запуске Windows."});
+      try{
+        if(req.headers["content-type"]!=="application/json")return json(res,415,{error:"Ожидался JSON."});
+        const body=await readJson(req);
+        if(!body||body.confirm!=="INSTALL_VERIFIED_RELEASE")return json(res,400,{error:"Не подтверждена установка."});
+        const latest=await updater.check(options.updateFetchImpl||fetch,BASE_DIR);
+        if(!latest.available)return json(res,409,{error:latest.reason||"Доступного обновления нет."});
+        const logDir=path.join(BASE_DIR,".updates");
+        fs.mkdirSync(logDir,{recursive:true});
+        const log=fs.openSync(path.join(logDir,"updater.log"),"a",0o600);
+        let child;
+        try{
+          child=spawn(process.execPath,[path.join(BASE_DIR,"update-worker.js"),"install","--wait-pid="+process.pid,
+            "--expected-tag="+latest.latest],{
+            detached:true,windowsHide:true,stdio:["ignore",log,log],cwd:BASE_DIR
+          });
+        }finally{fs.closeSync(log);}
+        if(!child.pid)return json(res,500,{error:"Не удалось запустить установщик."});
+        child.on("error",()=>{});
+        child.unref();
+        json(res,202,{started:true,tag:latest.latest,
+          message:"Сервер завершает работу для установки. Результат: .updates/updater.log"});
+        setImmediate(()=>server.close(()=>process.exit(0)));
+        return;
+      }catch(e){return json(res,500,{error:"Не удалось начать обновление: "+e.message});}
+    }
     if (req.method === "GET" && pathname === "/api/status") {
       return json(res, 200, { configured: engine.configured(env), model: env.AMAYURENA_MODEL || "endpoint-selected" });
     }
@@ -376,6 +411,7 @@ function createServer(options = {}) {
     }
     return json(res, 404, { error: "Не найдено." });
   });
+  return server;
 }
 
 function openBrowser(url) {
@@ -400,6 +436,16 @@ if (require.main === module) {
       process.exitCode = 1;
     });
     server.listen(port, "127.0.0.1", () => {
+      const pidDir=path.join(BASE_DIR,".updates");
+      fs.mkdirSync(pidDir,{recursive:true});
+      const pidFile=path.join(pidDir,"server.pid");
+      fs.writeFileSync(pidFile,String(process.pid),{mode:0o600});
+      process.on("exit",()=>{
+        try{
+          if(fs.existsSync(pidFile)&&fs.readFileSync(pidFile,"utf8").trim()===String(process.pid))
+            fs.unlinkSync(pidFile);
+        }catch(_){}
+      });
       const url = "http://127.0.0.1:" + server.address().port + "/";
       console.log("Amayurena запущена: " + url);
       console.log("Cloud.ru: " + (engine.configured(process.env) ? "настроен" : "не настроен"));

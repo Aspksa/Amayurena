@@ -13,6 +13,15 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+if exist "%~dp0.updates\recovery.json" (
+  echo Previous update was interrupted; restoring original files...
+  node "%~dp0update-worker.js" recover
+  if errorlevel 1 (
+    echo Safe recovery failed. Do not continue until the backup is inspected.
+    pause
+    exit /b 1
+  )
+)
 echo Starting Amayurena...
 node "%~dp0server.js"
 if errorlevel 1 (

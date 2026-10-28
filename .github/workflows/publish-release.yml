@@ -1,0 +1,32 @@
+name: Publish verified portable release
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node -e 'const fs=require("fs"); const current=JSON.parse(fs.readFileSync("project-version.json","utf8")).version; if("v"+current!==process.env.RELEASE_TAG){console.error("Tag and project-version.json differ");process.exit(1)}'
+      - name: Validate JavaScript and test suite
+        run: |
+          for src in *.js; do node --check "$src"; done
+          node --test tests/*.test.cjs
+      - name: Assemble code-only release
+        run: |
+          zip -q -r Amayurena-update.zip *.js *.css *.bat *.md *.json *.svg assets/avatars
+          sha256sum Amayurena-update.zip > Amayurena-update.zip.sha256
+      - name: Publish stable release after tests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" Amayurena-update.zip Amayurena-update.zip.sha256 --title "Amayurena $RELEASE_TAG" --notes "Portable verified release for Windows 10/11. Before upgrading, back up your data folder separately."
