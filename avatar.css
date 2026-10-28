@@ -101,3 +101,8 @@
 .am-upload-row .am-secondary { font-size: 12px; padding: 9px 14px; }
 .am-upload-row .am-help-text { margin-top: 11px; }
 .am-upload-status { min-height: 16px; color: #826239; font-size: 12px; margin: 8px 0 0; }
+
+.am-upload-heading { margin: 0 0 8px; font: 600 15px Georgia, serif; color: #6c4e25; }
+.am-pull-link { display: inline-block; margin: 6px 0; font-weight: 650; color: #946725; text-decoration: underline; }
+.am-pull-link:hover { color: #6f4918; }
+.am-upload-row .am-primary:disabled { opacity: .55; cursor: not-allowed; }

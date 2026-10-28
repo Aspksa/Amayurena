@@ -6,6 +6,7 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 const engine = require("./server-core");
 const avatarInstaller = require("./avatar-package");
+const avatarPublisher = require("./avatar-publisher");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -78,6 +79,7 @@ function createServer(options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
   const avatarRoot = options.avatarDirectory || BASE_DIR;
   let busy = 0;
+  let avatarPublishing = false;
   return http.createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "no-referrer");
@@ -97,6 +99,30 @@ function createServer(options = {}) {
     const pathname = (req.url || "").split("?")[0];
     if (req.method === "GET" && pathname === "/api/status") {
       return json(res, 200, { configured: engine.configured(env), model: env.AMAYURENA_MODEL || "endpoint-selected" });
+    }
+    if (req.method === "GET" && pathname === "/api/avatar/publish/status") {
+      return json(res, 200, avatarPublisher.status(avatarRoot, env));
+    }
+    if (req.method === "POST" && pathname === "/api/avatar/publish") {
+      if (avatarPublishing) return json(res, 429, { error: "Публикация изображений уже выполняется." });
+      if (req.headers["content-type"] !== "application/json") {
+        return json(res, 415, { error: "Ожидался JSON-запрос." });
+      }
+      avatarPublishing = true;
+      try {
+        const payload = await readJson(req);
+        if (!payload || payload.confirm !== "PUBLISH_AVATARS") {
+          return json(res, 400, { error: "Публикация требует явного подтверждения." });
+        }
+        const result = await avatarPublisher.publishAvatars(avatarRoot, env, fetchImpl);
+        return json(res, 200, result);
+      } catch (error) {
+        return json(res, error.status || 500, {
+          error: error.status ? error.message : "Не удалось подготовить публикацию в GitHub."
+        });
+      } finally {
+        avatarPublishing = false;
+      }
     }
     if (req.method === "POST" && pathname === "/api/avatar/install") {
       if (req.headers["content-type"] !== "application/zip") {
