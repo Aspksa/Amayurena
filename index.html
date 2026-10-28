@@ -14,6 +14,7 @@
   <script defer src="./agents-core.js"></script>
   <script defer src="./workspace.js"></script>
   <script defer src="./knowledge-native.js"></script>
+  <script defer src="./knowledge-editor-tools.js"></script>
   <script defer src="./knowledge-markdown.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge.js"></script>
@@ -176,20 +177,50 @@
               <button id="knowledge-create" type="button" class="btn btn-primary">＋ Заметка</button>
               <button id="knowledge-folder" type="button" class="btn btn-soft">＋ Папка</button>
             </div>
-            <div id="knowledge-tree" class="knowledge-tree" aria-label="Список заметок"></div>
+            <div class="knowledge-sidebar-section">
+              <div class="knowledge-sidebar-heading">Избранное</div>
+              <div id="knowledge-favorites" class="knowledge-shortcuts"></div>
+            </div>
+            <div class="knowledge-sidebar-section">
+              <div class="knowledge-sidebar-heading">Недавние</div>
+              <div id="knowledge-recent" class="knowledge-shortcuts"></div>
+            </div>
+            <div class="knowledge-sidebar-section">
+              <div class="knowledge-sidebar-heading">Папки и заметки</div>
+              <div id="knowledge-tree" class="knowledge-tree" aria-label="Дерево папок и заметок"></div>
+            </div>
           </aside>
           <section id="knowledge-editor-panel" class="knowledge-document" aria-label="Редактор заметки" hidden>
+            <div class="knowledge-tabs-toolbar">
+              <div id="knowledge-open-tabs" class="knowledge-open-tabs" role="tablist" aria-label="Открытые заметки"></div>
+              <button id="knowledge-tab-close" class="btn btn-soft" type="button" title="Закрыть текущую вкладку">Закрыть вкладку</button>
+            </div>
+            <div class="knowledge-editor-breadcrumbs" id="knowledge-breadcrumbs" aria-label="Путь заметки"></div>
             <header class="knowledge-editor-header">
               <div>
                 <span class="eyebrow">РЕДАКТОР MARKDOWN</span>
                 <strong id="knowledge-path" class="knowledge-path"></strong>
               </div>
               <div class="knowledge-editor-controls">
+                <button id="knowledge-favorite" class="btn btn-soft" type="button" aria-pressed="false">☆ В избранное</button>
+                <button id="knowledge-pin" class="btn btn-soft" type="button" aria-pressed="false">Закрепить</button>
                 <button id="knowledge-rename" class="btn btn-soft" type="button">Переименовать / переместить</button>
                 <button id="knowledge-save" class="btn btn-soft" type="button">Сохранить</button>
+                <button id="knowledge-save-copy" class="btn btn-soft" type="button" title="Сохранить текущий текст в новый файл, например при конфликте">Сохранить копию</button>
                 <button id="knowledge-delete" class="btn btn-danger" type="button">Удалить</button>
               </div>
             </header>
+            <div id="knowledge-format-toolbar" class="knowledge-format-toolbar" role="toolbar" aria-label="Форматирование Markdown">
+              <button type="button" data-format="heading" title="Заголовок">H2</button>
+              <button type="button" data-format="bold" title="Полужирный"><strong>Ж</strong></button>
+              <button type="button" data-format="italic" title="Курсив"><em>К</em></button>
+              <button type="button" data-format="bullet" title="Маркированный список">≡</button>
+              <button type="button" data-format="task" title="Задача">☐</button>
+              <button type="button" data-format="quote" title="Цитата">❞</button>
+              <button type="button" data-format="code" title="Код">⌘</button>
+              <button type="button" data-format="wikilink" title="Связь с заметкой">[[]]</button>
+              <button type="button" data-format="link" title="Ссылка">↗</button>
+            </div>
             <label class="sr-only" for="knowledge-editor">Текст Markdown</label>
             <textarea id="knowledge-editor" class="knowledge-editor" spellcheck="true" placeholder="Начните писать… Используйте [[Название заметки]] для связи."></textarea>
             <h3>Предпросмотр</h3>
