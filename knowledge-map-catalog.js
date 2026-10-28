@@ -38,8 +38,6 @@ function view(root,{folder="",q="",page=0,size=120}={}){
   for(const link of n.links){
    const normal=link.replace(/\.md$/i,"").toLocaleLowerCase("ru");
    const full=normal+".md";
-   const target=byPath.get((n.folder?n.folder+"/":"")+full)||
-     byPath.get(full)||(titles.get(normal)||[]).length===1?undefined:undefined;
    // Resolve exact paths first; ambiguous titles are not assumed to be links.
    let resolved=byPath.get((n.folder?n.folder+"/":"")+full)||byPath.get(full);
    if(!resolved && (titles.get(normal)||[]).length===1)resolved=titles.get(normal)[0];
