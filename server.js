@@ -7,6 +7,7 @@ const { spawn } = require("node:child_process");
 const engine = require("./server-core");
 const avatarInstaller = require("./avatar-package");
 const avatarPublisher = require("./avatar-publisher");
+const knowledge = require("./knowledge-core");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -14,6 +15,8 @@ const STATIC_FILES = Object.freeze({
   "/index.html": ["index.html", "text/html; charset=utf-8"],
   "/styles.css": ["styles.css", "text/css; charset=utf-8"],
   "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
+  "/knowledge.css": ["knowledge.css", "text/css; charset=utf-8"],
+  "/knowledge.js": ["knowledge.js", "text/javascript; charset=utf-8"],
   "/avatar.css": ["avatar.css", "text/css; charset=utf-8"],
   "/avatar.js": ["avatar.js", "text/javascript; charset=utf-8"],
   "/avatar-assets.js": ["avatar-assets.js", "text/javascript; charset=utf-8"],
@@ -79,6 +82,7 @@ function createServer(options = {}) {
   const env = options.env || process.env;
   const fetchImpl = options.fetchImpl || fetch;
   const avatarRoot = options.avatarDirectory || BASE_DIR;
+  const knowledgeRoot = options.knowledgeDirectory || path.join(BASE_DIR, "data", "knowledge");
   let busy = 0;
   let avatarPublishing = false;
   return http.createServer(async (req, res) => {
@@ -100,6 +104,31 @@ function createServer(options = {}) {
     const pathname = (req.url || "").split("?")[0];
     if (req.method === "GET" && pathname === "/api/status") {
       return json(res, 200, { configured: engine.configured(env), model: env.AMAYURENA_MODEL || "endpoint-selected" });
+    }
+    if (pathname === "/api/knowledge" && req.method === "GET") {
+      try { return json(res, 200, knowledge.list(knowledgeRoot)); }
+      catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка чтения базы знаний." }); }
+    }
+    if (pathname === "/api/knowledge/graph" && req.method === "GET") {
+      try { return json(res, 200, knowledge.graph(knowledgeRoot)); }
+      catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка построения графа." }); }
+    }
+    if (pathname === "/api/knowledge/note" && ["GET", "POST", "DELETE"].includes(req.method)) {
+      try {
+        const search = new URL(req.url, "http://localhost").searchParams;
+        if (req.method === "GET") return json(res, 200, knowledge.read(knowledgeRoot, search.get("path")));
+        if (req.method === "DELETE") return json(res, 200, knowledge.remove(knowledgeRoot, search.get("path")));
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON-запрос." });
+        const body = await readJson(req);
+        return json(res, 200, knowledge.save(knowledgeRoot, body && body.path, body && body.content));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка работы с заметкой." }); }
+    }
+    if (pathname === "/api/knowledge/folder" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON-запрос." });
+        const body = await readJson(req);
+        return json(res, 200, knowledge.makeFolder(knowledgeRoot, body && body.path));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка создания папки." }); }
     }
     if (req.method === "GET" && pathname === "/api/avatar/publish/status") {
       return json(res, 200, avatarPublisher.status(avatarRoot, env));
