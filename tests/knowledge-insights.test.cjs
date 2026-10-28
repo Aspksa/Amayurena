@@ -76,7 +76,7 @@ test("notes outside analysis limit are not mislabeled as missing links",()=>fixt
   assert.equal(data.truncated,true);
   assert.ok(data.outside.some(e=>e.from==="Тема 000.md"&&e.to==="Тема 180.md"));
   assert.equal(data.missing.some(e=>e.reference==="Тема 180"),false);
-});
+}));
 test("approve suggestion adds one valid wiki-link and saves original note in history",()=>fixture(s=>{
   seed(s);
   const from="Гараж/Двигатель.md",to="Гараж/Ремонт.md";
