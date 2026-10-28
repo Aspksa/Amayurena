@@ -291,6 +291,7 @@
         const zipNote = node("p", "am-help-text", "Установит все 10 оригинальных WebP в папку assets/avatars проекта. Требуется запуск через Amayurena.bat.");
         const zipStatus = node("p", "am-upload-status", "");
         zipStatus.setAttribute("role", "status");
+        zipStatus.id = "am-avatar-zip-status";
         zipInput.addEventListener("change", async () => {
           const file = zipInput.files && zipInput.files[0];
           zipInput.value = "";
@@ -319,7 +320,8 @@
             window.AmayurenaAvatarAssetsApi.reloadInstalled();
             buildSettings();
             render();
-            zipStatus.textContent = "Готово: 10 поз установлены в assets/avatars.";
+            const currentStatus = document.getElementById("am-avatar-zip-status");
+            if (currentStatus) currentStatus.textContent = "Готово: 10 поз установлены в assets/avatars.";
           } catch (error) {
             zipStatus.textContent = "Ошибка: " + error.message;
           } finally {
@@ -328,6 +330,58 @@
         });
         zipUploader.append(zipButton, zipInput, zipNote, zipStatus);
         panel.append(zipUploader);
+
+        const publisher = node("div", "am-upload-row");
+        const publishTitle = node("h4", "am-upload-heading", "Публикация в GitHub");
+        const publishNote = node("p", "am-help-text",
+          "Публикует установленные изображения в публичном Aspksa/Amayurena через отдельный Pull Request. Нужен GitHub-токен на локальном сервере.");
+        const publishButton = button("Создать PR с аватарами", async () => {
+          if (!confirm("Опубликовать 10 изображений из папки проекта в ПУБЛИЧНОМ репозитории Aspksa/Amayurena? Будет создан Pull Request для проверки.")) return;
+          publishButton.disabled = true;
+          publishOutput.replaceChildren(node("span", "", "Передача 10 изображений в GitHub…"));
+          try {
+            const response = await fetch("/api/avatar/publish", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ confirm: "PUBLISH_AVATARS" })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.pullRequest) throw new Error(result.error || "Публикация не завершена.");
+            const link = node("a", "am-pull-link", "Открыть Pull Request");
+            const address = new URL(result.pullRequest);
+            if (address.origin !== "https://github.com" ||
+                !/^\/Aspksa\/Amayurena\/pull\/\d+$/.test(address.pathname)) throw new Error("GitHub вернул неизвестную ссылку.");
+            link.href = result.pullRequest;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            publishOutput.replaceChildren(node("span", "", "PR создан. Изображений: " + result.published + ". "), link);
+          } catch (error) {
+            publishOutput.replaceChildren(node("span", "", "Ошибка публикации: " + error.message));
+          } finally { publishButton.disabled = false; }
+        }, "am-primary");
+        publishButton.disabled = true;
+        const publishOutput = node("div", "am-upload-status");
+        publishOutput.setAttribute("role", "status");
+        publishOutput.textContent = "Проверка локальных изображений…";
+        publisher.append(publishTitle, publishNote, publishButton, publishOutput);
+        panel.append(publisher);
+        (async () => {
+          try {
+            if (location.protocol === "file:") throw new Error("Запустите Amayurena.bat.");
+            const response = await fetch("/api/avatar/publish/status");
+            if (!response.ok) throw new Error("Сервер недоступен.");
+            const result = await response.json();
+            if (!publisher.isConnected) return;
+            publishButton.disabled = result.installed !== 10 || !result.configured;
+            const notes = [];
+            notes.push("Установлено: " + (result.installed || 0) + " / 10");
+            if (result.installed === 10) notes.push("разных изображений: " + result.unique);
+            if (!result.configured) notes.push("задайте AMAYURENA_GITHUB_TOKEN и перезапустите сайт");
+            publishOutput.textContent = notes.join(" · ");
+          } catch (error) {
+            if (publisher.isConnected) publishOutput.textContent = error.message;
+          }
+        })();
       }
       left.append(panel);
     }
