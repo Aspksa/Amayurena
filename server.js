@@ -1,0 +1,134 @@
+"use strict";
+
+const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+const engine = require("./server-core");
+
+const BASE_DIR = __dirname;
+const STATIC_FILES = Object.freeze({
+  "/": ["index.html", "text/html; charset=utf-8"],
+  "/index.html": ["index.html", "text/html; charset=utf-8"],
+  "/styles.css": ["styles.css", "text/css; charset=utf-8"],
+  "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
+  "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/agents-core.js": ["agents-core.js", "text/javascript; charset=utf-8"],
+  "/workspace.js": ["workspace.js", "text/javascript; charset=utf-8"]
+});
+const MAX_BODY_BYTES = 128 * 1024;
+
+function json(res, code, body) {
+  res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(body));
+}
+
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let length = 0;
+    const chunks = [];
+    req.on("data", chunk => {
+      length += chunk.length;
+      if (length > MAX_BODY_BYTES) {
+        reject(Object.assign(new Error("Запрос слишком большой."), { status: 413 }));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))); }
+      catch (_) { reject(Object.assign(new Error("Некорректный JSON."), { status: 400 })); }
+    });
+    req.on("error", reject);
+  });
+}
+
+function createServer(options = {}) {
+  const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || fetch;
+  let busy = 0;
+  return http.createServer(async (req, res) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    const host = (req.headers.host || "").toLowerCase();
+    if (!/^(localhost|127\.0\.0\.1)(:\d{1,5})?$/.test(host)) {
+      return json(res, 403, { error: "Доступ разрешён только с локального компьютера." });
+    }
+    const origin = req.headers.origin;
+    if (origin) {
+      let originHost;
+      try { originHost = new URL(origin).host.toLowerCase(); }
+      catch (_) { return json(res, 403, { error: "Неверный Origin." }); }
+      if (originHost !== host) return json(res, 403, { error: "Запрещён сторонний запрос." });
+    }
+    const pathname = (req.url || "").split("?")[0];
+    if (req.method === "GET" && pathname === "/api/status") {
+      return json(res, 200, { configured: engine.configured(env), model: env.AMAYURENA_MODEL || "endpoint-selected" });
+    }
+    if (req.method === "POST" && pathname === "/api/tools") {
+      try {
+        const body = await readJson(req);
+        const result = engine.toolResult(body.name, body.args);
+        return json(res, 200, { result });
+      } catch (e) { return json(res, e.status || 400, { error: e.message }); }
+    }
+    if (req.method === "POST" && pathname === "/api/chat") {
+      if (busy >= 2) return json(res, 429, { error: "Два запроса уже выполняются. Повторите после их завершения." });
+      busy++;
+      try {
+        const body = await readJson(req);
+        const answer = await engine.chatCompletion(body, { env, fetchImpl });
+        return json(res, 200, answer);
+      } catch (e) {
+        return json(res, e.status || 400, { error: e.message || "Ошибка обработки запроса." });
+      } finally { busy--; }
+    }
+    if (req.method === "GET" || req.method === "HEAD") {
+      const file = STATIC_FILES[pathname];
+      if (file) {
+        const filename = path.join(BASE_DIR, file[0]);
+        try {
+          const data = fs.readFileSync(filename);
+          res.writeHead(200, { "Content-Type": file[1], "Cache-Control": "no-store" });
+          return res.end(req.method === "HEAD" ? undefined : data);
+        } catch (_) { return json(res, 500, { error: "Файл приложения недоступен." }); }
+      }
+    }
+    return json(res, 404, { error: "Не найдено." });
+  });
+}
+
+function openBrowser(url) {
+  if (process.platform !== "win32" || process.env.AMAYURENA_NO_BROWSER === "1") return;
+  try {
+    const processHandle = spawn("cmd.exe", ["/d", "/s", "/c", 'start "" "' + url + '"'], {
+      detached: true, stdio: "ignore", windowsHide: true
+    });
+    processHandle.on("error", () => {});
+    processHandle.unref();
+  } catch (_) { /* The URL is printed even when a browser cannot be opened. */ }
+}
+
+if (require.main === module) {
+  const port = process.env.AMAYURENA_PORT === undefined ? 0 : Number(process.env.AMAYURENA_PORT);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    console.error("Неверный порт AMAYURENA_PORT."); process.exitCode = 1;
+  } else {
+    const server = createServer();
+    server.on("error", error => {
+      console.error("Не удалось запустить сервер:", error.message);
+      process.exitCode = 1;
+    });
+    server.listen(port, "127.0.0.1", () => {
+      const url = "http://127.0.0.1:" + server.address().port + "/";
+      console.log("Amayurena запущена: " + url);
+      console.log("Cloud.ru: " + (engine.configured(process.env) ? "настроен" : "не настроен"));
+      console.log("Для завершения нажмите Ctrl+C.");
+      openBrowser(url);
+    });
+  }
+}
+module.exports = { createServer, readJson };
