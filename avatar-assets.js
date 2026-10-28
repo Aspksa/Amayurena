@@ -46,6 +46,12 @@
       assets[index] = data;
     } finally { bitmap.close(); }
   }
+  function reloadInstalled() {
+    saved = {};
+    try { localStorage.removeItem(KEY); } catch (_) {}
+    const now = Date.now();
+    for (let i = 0; i < assets.length; i++) assets[i] = paths[i] + "?updated=" + now;
+  }
   window.AmayurenaAvatarAssets = assets;
-  window.AmayurenaAvatarAssetsApi = { importImage, ensureImage, fallback, paths };
+  window.AmayurenaAvatarAssetsApi = { importImage, ensureImage, reloadInstalled, fallback, paths };
 })();

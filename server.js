@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const engine = require("./server-core");
+const avatarInstaller = require("./avatar-package");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -51,9 +52,31 @@ function readJson(req) {
   });
 }
 
+function readZip(req) {
+  return new Promise((resolve, reject) => {
+    let length = 0, exceeded = false;
+    const chunks = [];
+    const expected = Number(req.headers["content-length"]);
+    if (Number.isFinite(expected) && expected > avatarInstaller.MAX_ARCHIVE) {
+      return reject(Object.assign(new Error("ZIP слишком большой (максимум 12 МБ)."), { status: 413 }));
+    }
+    req.on("data", chunk => {
+      if (exceeded) return;
+      length += chunk.length;
+      if (length > avatarInstaller.MAX_ARCHIVE) {
+        exceeded = true;
+        reject(Object.assign(new Error("ZIP слишком большой (максимум 12 МБ)."), { status: 413 }));
+      } else chunks.push(chunk);
+    });
+    req.on("end", () => { if (!exceeded) resolve(Buffer.concat(chunks)); });
+    req.on("error", reject);
+  });
+}
+
 function createServer(options = {}) {
   const env = options.env || process.env;
   const fetchImpl = options.fetchImpl || fetch;
+  const avatarRoot = options.avatarDirectory || BASE_DIR;
   let busy = 0;
   return http.createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -74,6 +97,19 @@ function createServer(options = {}) {
     const pathname = (req.url || "").split("?")[0];
     if (req.method === "GET" && pathname === "/api/status") {
       return json(res, 200, { configured: engine.configured(env), model: env.AMAYURENA_MODEL || "endpoint-selected" });
+    }
+    if (req.method === "POST" && pathname === "/api/avatar/install") {
+      if (req.headers["content-type"] !== "application/zip") {
+        return json(res, 415, { error: "Выберите ZIP-архив с 10 изображениями." });
+      }
+      try {
+        const archive = await readZip(req);
+        const result = avatarInstaller.installAvatarZip(archive, avatarRoot);
+        return json(res, 200, result);
+      } catch (error) {
+        return json(res, error.status || 500,
+          { error: error.status ? error.message : "Не удалось сохранить изображения в папке проекта." });
+      }
     }
     if (req.method === "POST" && pathname === "/api/tools") {
       try {
@@ -97,7 +133,7 @@ function createServer(options = {}) {
       const imageMatch = /^\/assets\/avatars\/(pose-0[1-9]|pose-10)\.webp$/.exec(pathname);
       const file = STATIC_FILES[pathname] || (imageMatch ? [path.join("assets", "avatars", imageMatch[1] + ".webp"), "image/webp"] : null);
       if (file) {
-        const filename = path.join(BASE_DIR, file[0]);
+        const filename = path.join(imageMatch ? avatarRoot : BASE_DIR, file[0]);
         try {
           const data = fs.readFileSync(filename);
           res.writeHead(200, { "Content-Type": file[1], "Cache-Control": "no-store" });
@@ -139,4 +175,4 @@ if (require.main === module) {
     });
   }
 }
-module.exports = { createServer, readJson };
+module.exports = { createServer, readJson, readZip };
