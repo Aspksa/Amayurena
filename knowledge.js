@@ -11,6 +11,7 @@
     create: $("knowledge-create"), folder: $("knowledge-folder")
   };
   let notes = [], folders = [], active = "", revision = 0, committed = 0, saveTimer = null;
+  let loadedSha = "", searchTimer = null, searchGeneration = 0, moveSource = null;
   let queue = Promise.resolve(), graph = { nodes: [], edges: [], missing: [] }, initialized = false;
 
   function node(tag, className, value) {
@@ -57,7 +58,11 @@
       const matches = visible.filter(n => n.folder === folder);
       if (!matches.length && query) continue;
       const block = node("div", "knowledge-folder-group");
-      block.append(node("div", "knowledge-folder-title", "▸ " + folder));
+      const folderButton = node("button", "knowledge-folder-title knowledge-folder-action", "▸ " + folder + " · Переместить");
+      folderButton.type = "button";
+      folderButton.title = "Переименовать или переместить папку";
+      folderButton.addEventListener("click", () => { void openMove("folder", folder); });
+      block.append(folderButton);
       matches.forEach(n => block.append(noteButton(n)));
       ui.tree.append(block);
     }
@@ -167,12 +172,22 @@
     renderTree(); renderBacklinks(); renderGraph();
     void window.AmayurenaKnowledgeAdvanced.update(notes, active);
   }
+  function draftKey(path) { return "amayurena.knowledge.draft." + path; }
+  function keepDraft(path, value) {
+    try { sessionStorage.setItem(draftKey(path), value); }
+    catch (_) { message("Черновик не удалось сохранить в браузере. Скопируйте текст перед закрытием.", true); }
+  }
+  function clearDraft(path, value) {
+    try { if (sessionStorage.getItem(draftKey(path)) === value) sessionStorage.removeItem(draftKey(path)); }
+    catch (_) { /* browser storage is optional */ }
+  }
   function scheduleSave() {
     if (!active) return;
     revision++;
-    message("Не сохранено");
+    keepDraft(active, ui.editor.value);
+    message("Ожидает сохранения…");
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { void saveNow(); }, 850);
+    saveTimer = setTimeout(() => { void saveNow(); }, 650);
     renderPreview();
   }
   function saveNow() {
@@ -180,13 +195,21 @@
     if (!active || revision <= committed) return queue;
     const savedPath = active, value = ui.editor.value, version = revision;
     queue = queue.catch(() => {}).then(async () => {
-      await post("/api/knowledge/note", { path: savedPath, content: value });
-      if (active === savedPath && version >= committed) {
-        committed = version;
-        message("Сохранено на диске");
+      message("Сохраняется…");
+      try {
+        const reply = await post("/api/knowledge/note", { path: savedPath, content: value, expectedSha: loadedSha });
+        if (active === savedPath) {
+          loadedSha = reply.sha;
+          committed = Math.max(committed, version);
+          clearDraft(savedPath, value);
+          message(revision > version ? "Есть новые несохранённые изменения" : "Сохранено на диске");
+        }
+        await refresh();
+      } catch (error) {
+        keepDraft(savedPath, value);
+        message("Не сохранено: " + error.message + " — текст остался в редакторе.", true);
       }
-      await refresh();
-    }).catch(error => { message("Ошибка сохранения: " + error.message, true); });
+    });
     return queue;
   }
   async function openNote(path, force = false) {
@@ -199,13 +222,23 @@
       const record = await request("/api/knowledge/note?path=" + encodeURIComponent(path));
       active = record.path;
       ui.editor.value = record.content;
+      loadedSha = record.sha || "";
+      try {
+        const unsaved = sessionStorage.getItem(draftKey(record.path));
+        if (unsaved !== null && unsaved !== record.content &&
+            confirm("Найден несохранённый черновик этой заметки в браузере. Восстановить его?")) {
+          ui.editor.value = unsaved;
+        }
+      } catch (_) { /* no browser storage */ }
       ui.path.textContent = record.path;
       ui.panel.hidden = false;
-      revision = 0; committed = 0;
-      renderTree(); renderPreview(); renderBacklinks(); renderGraph();
+      revision = ui.editor.value === record.content ? 0 : 1;
+      committed = 0;
+      renderTree(); renderPreview();
+      if (revision) { keepDraft(record.path, ui.editor.value); message("Восстановлен черновик. Нажмите «Сохранить»."); } renderBacklinks(); renderGraph();
       void window.AmayurenaKnowledgeAdvanced.update(notes, active);
       setMode("editor");
-      message("Готово к редактированию");
+      if (!revision) message("Готово к редактированию");
     } catch (error) { message(error.message, true); }
   }
   function createError(text) {
