@@ -8,8 +8,7 @@
     stats: $("knowledge-stats"), status: $("knowledge-status"), panel: $("knowledge-editor-panel"),
     graphPanel: $("knowledge-graph-panel"), delete: $("knowledge-delete"),
     save: $("knowledge-save"), mode: $("knowledge-mode"),
-    create: $("knowledge-create"), folder: $("knowledge-folder"),
-    importButton: $("knowledge-import"), importFile: $("knowledge-import-files")
+    create: $("knowledge-create"), folder: $("knowledge-folder")
   };
   let notes = [], folders = [], active = "", revision = 0, committed = 0, saveTimer = null;
   let queue = Promise.resolve(), graph = { nodes: [], edges: [], missing: [] }, initialized = false;
@@ -62,8 +61,17 @@
       matches.forEach(n => block.append(noteButton(n)));
       ui.tree.append(block);
     }
-    if (!visible.length && !folders.length) ui.tree.append(node("p", "knowledge-placeholder", "Заметок пока нет."));
-    else if (!visible.length && query) ui.tree.append(node("p", "knowledge-placeholder", "Ничего не найдено."));
+    if (!notes.length) {
+      const empty = node("div", "knowledge-first-start");
+      empty.append(node("strong", "", "Ваша база знаний пока пуста."),
+        node("p", "", "Начните с собственной заметки. Импорт и дополнительные программы не нужны."));
+      const begin = node("button", "btn btn-primary", "＋ Первая заметка");
+      begin.type = "button";
+      begin.addEventListener("click", openCreateDialog);
+      empty.append(begin); ui.tree.append(empty);
+    } else if (!visible.length && query) {
+      ui.tree.append(node("p", "knowledge-placeholder", "Ничего не найдено."));
+    }
     ui.stats.textContent = notes.length + " заметок · " + folders.length + " папок · " + graph.edges.length + " связей";
   }
   function resolveLink(from, target) {
@@ -200,56 +208,109 @@
       message("Готово к редактированию");
     } catch (error) { message(error.message, true); }
   }
-  async function createNote() {
-    const raw = prompt("Путь новой заметки (например, Идеи/Моя заметка.md):", "Новая заметка.md");
-    if (raw === null) return;
-    const path = raw.trim();
-    if (!path) return;
-    if (notes.some(note => note.path.toLocaleLowerCase("ru") === path.toLocaleLowerCase("ru"))) {
-      message("Заметка с таким именем уже существует.", true); return;
-    }
-    await saveNow();
-    if (active && revision > committed) return;
-    try {
-      await post("/api/knowledge/note", { path, content: "# " + path.split("/").pop().replace(/\.md$/i, "") + "\n\n" });
-      await refresh();
-      await openNote(path);
-    } catch (error) { message(error.message, true); }
+  function createError(text) {
+    const target = $("knowledge-create-error");
+    target.textContent = text;
+    target.hidden = !text;
   }
-  async function createFolder() {
-    const raw = prompt("Название папки (например, Проекты/Идеи):");
-    if (raw === null || !raw.trim()) return;
-    try { await post("/api/knowledge/folder", { path: raw.trim() }); await refresh(); message("Папка создана."); }
-    catch (error) { message(error.message, true); }
+  function folderError(text) {
+    const target = $("knowledge-folder-error");
+    target.textContent = text;
+    target.hidden = !text;
+  }
+  function previewNewNote() {
+    const title = $("knowledge-create-name").value;
+    const folder = $("knowledge-create-folder").value;
+    const template = $("knowledge-create-template").value;
+    try {
+      if (!title.trim()) {
+        $("knowledge-create-preview").textContent = "Введите название, чтобы увидеть содержимое.";
+        return;
+      }
+      const draft = window.AmayurenaNative.buildNote(title, folder, template);
+      $("knowledge-create-preview").textContent = draft.content;
+    } catch (err) {
+      $("knowledge-create-preview").textContent = err.message;
+    }
+  }
+  function openCreateDialog() {
+    const dialog = $("knowledge-create-dialog");
+    $("knowledge-create-form").reset();
+    const select = $("knowledge-create-folder");
+    select.replaceChildren();
+    const root = node("option", "", "Корень базы знаний");
+    root.value = "";
+    select.append(root);
+    for (const folder of folders) {
+      const option = node("option", "", folder);
+      option.value = folder;
+      select.append(option);
+    }
+    const currentFolder = active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";
+    if (folders.includes(currentFolder)) select.value = currentFolder;
+    createError("");
+    previewNewNote();
+    dialog.showModal();
+    $("knowledge-create-name").focus();
+  }
+  async function submitCreate(event) {
+    event.preventDefault();
+    const submit = $("knowledge-create-submit");
+    if (submit.disabled) return;
+    let draft;
+    try {
+      draft = window.AmayurenaNative.buildNote(
+        $("knowledge-create-name").value,
+        $("knowledge-create-folder").value,
+        $("knowledge-create-template").value);
+    } catch (err) { createError(err.message); return; }
+    if (notes.some(n => n.path.toLocaleLowerCase("ru") === draft.path.toLocaleLowerCase("ru"))) {
+      createError("Заметка с таким названием уже существует в выбранной папке.");
+      return;
+    }
+    submit.disabled = true;
+    createError("");
+    try {
+      await saveNow();
+      if (active && revision > committed) throw new Error("Сначала сохраните текущую заметку.");
+      await post("/api/knowledge/note/create", { path: draft.path, content: draft.content });
+      await refresh();
+      $("knowledge-create-dialog").close();
+      await openNote(draft.path);
+      message("Создана новая заметка: " + draft.title);
+    } catch (err) { createError("Не удалось создать заметку: " + err.message); }
+    finally { submit.disabled = false; }
+  }
+  function openFolderDialog() {
+    $("knowledge-folder-form").reset();
+    folderError("");
+    $("knowledge-folder-dialog").showModal();
+    $("knowledge-folder-name").focus();
+  }
+  async function submitFolder(event) {
+    event.preventDefault();
+    const button = $("knowledge-folder-submit");
+    if (button.disabled) return;
+    const path = $("knowledge-folder-name").value.trim();
+    button.disabled = true;
+    folderError("");
+    try {
+      await post("/api/knowledge/folder", { path });
+      await refresh();
+      $("knowledge-folder-dialog").close();
+      message("Создана папка: " + path);
+    } catch (err) { folderError("Не удалось создать папку: " + err.message); }
+    finally { button.disabled = false; }
   }
   async function deleteNote() {
-    if (!active || !confirm("Удалить заметку «" + active + "»? Это действие нельзя отменить.")) return;
+    if (!active || !confirm("Удалить заметку «" + active + "»? Предыдущая версия останется в истории.")) return;
     await saveNow();
     if (active && revision > committed) return;
     try {
       await request("/api/knowledge/note?path=" + encodeURIComponent(active), { method: "DELETE" });
       active = ""; ui.editor.value = ""; ui.path.textContent = ""; ui.panel.hidden = true;
-      await refresh(); message("Заметка удалена.");
+      await refresh(); message("Заметка удалена. История сохранена.");
     } catch (error) { message(error.message, true); }
-  }
-  async function importNotes(event) {
-    const files = [...(event.target.files || [])];
-    event.target.value = "";
-    if (!files.length) return;
-    await saveNow();
-    if (active && revision > committed) return;
-    let count = 0;
-    for (const file of files) {
-      if (!/\.md$/i.test(file.name) || file.size > 128 * 1024) { message("Пропущен неподдерживаемый файл: " + file.name, true); continue; }
-      try {
-        if (notes.some(n => n.path.toLocaleLowerCase("ru") === file.name.toLocaleLowerCase("ru"))) {
-          message("Пропущен существующий файл: " + file.name, true); continue;
-        }
-        await post("/api/knowledge/note", { path: file.name, content: await file.text() });
-        count++; await refresh();
-      } catch (error) { message(file.name + ": " + error.message, true); }
-    }
-    if (count) message("Импортировано заметок: " + count);
   }
   function setMode(mode) {
     const isGraph = mode === "graph";
@@ -273,13 +334,18 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void saveNow(); }
       });
       ui.search.addEventListener("input", renderTree);
-      ui.create.addEventListener("click", () => { void createNote(); });
-      ui.folder.addEventListener("click", () => { void createFolder(); });
+      ui.create.addEventListener("click", openCreateDialog);
+      ui.folder.addEventListener("click", openFolderDialog);
+      $("knowledge-create-form").addEventListener("submit", event => { void submitCreate(event); });
+      $("knowledge-create-cancel").addEventListener("click", () => $("knowledge-create-dialog").close());
+      $("knowledge-create-name").addEventListener("input", previewNewNote);
+      $("knowledge-create-folder").addEventListener("change", previewNewNote);
+      $("knowledge-create-template").addEventListener("change", previewNewNote);
+      $("knowledge-folder-form").addEventListener("submit", event => { void submitFolder(event); });
+      $("knowledge-folder-cancel").addEventListener("click", () => $("knowledge-folder-dialog").close());
       ui.delete.addEventListener("click", () => { void deleteNote(); });
       ui.save.addEventListener("click", () => { void saveNow(); });
       ui.mode.addEventListener("click", () => setMode(ui.mode.dataset.current === "graph" ? "editor" : "graph"));
-      ui.importButton.addEventListener("click", () => ui.importFile.click());
-      ui.importFile.addEventListener("change", e => { void importNotes(e); });
     }
     try { await refresh(); message("База знаний доступна локально."); }
     catch (error) { message("Не удалось открыть хранилище: " + error.message, true); }
