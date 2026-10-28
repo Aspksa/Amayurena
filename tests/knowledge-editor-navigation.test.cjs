@@ -42,7 +42,7 @@ class Element {
   get firstElementChild() { return this.children[0]; }
   click() { if (this.listeners.click) return this.listeners.click({target:this,preventDefault(){}}); }
 }
-function fakeApp({ delayed = false } = {}) {
+function fakeApp({ delayed = false, copyPath = null } = {}) {
   const elements = new Map();
   const get = id => {
     if (!elements.has(id)) elements.set(id,new Element(id));
@@ -76,6 +76,12 @@ function fakeApp({ delayed = false } = {}) {
       const body = notes.get(path);
       return body===undefined ? json({error:"Заметка не найдена"},404) : json({path,content:body,sha:hash(body)});
     }
+    if(url==="/api/knowledge/note/create" && method==="POST") {
+      const data=JSON.parse(options.body);
+      if(notes.has(data.path)) return json({error:"Уже существует"},409);
+      notes.set(data.path,data.content);
+      return json({path:data.path,created:true},201);
+    }
     if(url==="/api/knowledge/note" && method==="POST") {
       const data=JSON.parse(options.body);
       saveStarted = true;
@@ -88,7 +94,7 @@ function fakeApp({ delayed = false } = {}) {
   };
   const context={document,window:win,localStorage:store,sessionStorage:session,fetch,
     URL,URLSearchParams,console,setTimeout,clearTimeout,confirm:()=>false,
-    prompt:()=>null,location:{reload(){}},crypto,Date};
+    prompt:()=>copyPath,location:{reload(){}},crypto,Date};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,"..","knowledge.js"),"utf8"),
     context,{filename:"knowledge.js"});
   function findNote(path) {
@@ -145,4 +151,23 @@ test("conflicting external edit blocks a tab change and preserves the draft",asy
   assert.equal(app.get("knowledge-editor").value,"My unsaved change");
   assert.equal(app.notes.get("A.md"),"External change");
   assert.equal(app.session.getItem("amayurena.knowledge.draft.A.md"),"My unsaved change");
+});
+
+
+test("when a conflict occurs, Save Copy preserves both the external edit and the user's draft",async()=>{
+  const app=fakeApp({copyPath:"A - копия.md"});
+  await app.app.open();
+  app.findNote("A.md").click();
+  await until(()=>app.get("knowledge-path").textContent==="A.md","open A");
+  app.get("knowledge-editor").value="My important draft";
+  app.get("knowledge-editor").listeners.input();
+  app.externalEdit("A.md","External text");
+  app.findNote("B.md").click();
+  await until(()=>app.saveStarted,"conflicting save");
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(app.get("knowledge-path").textContent,"A.md");
+  app.get("knowledge-save-copy").click();
+  await until(()=>app.get("knowledge-path").textContent==="A - копия.md","copy opened");
+  assert.equal(app.notes.get("A.md"),"External text");
+  assert.equal(app.notes.get("A - копия.md"),"My important draft");
 });
