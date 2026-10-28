@@ -52,6 +52,10 @@ jobs:
           node --check avatar-package.js
           node --check avatar-publisher.js
           node --check server.js
+          node --check update-core.js
+          node --check update-worker.js
+          node --check update-ui.js
+          node --check tests/update-core.test.cjs
           node --check server-core.js
           node --check tests/agents.test.cjs
       - name: Run agent model tests
