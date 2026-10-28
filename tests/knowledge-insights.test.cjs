@@ -72,13 +72,13 @@ test("approve suggestion adds one valid wiki-link and saves original note in his
   seed(s);
   const from="Гараж/Двигатель.md",to="Гараж/Ремонт.md";
   const first=knowledge.read(s.notes,from).content;
-  const result=insights.accept(s.notes,s.history,s.canvas,{from,to,expectedSha:insights.sha(first)});
+  const result=insights.accept(s.notes,s.history,s.canvas,{from,to,expectedSha:insights.sha(first),targetSha:insights.sha(knowledge.read(s.notes,to).content)});
   assert.equal(result.saved,true);
   assert.match(knowledge.read(s.notes,from).content,/\[\[Гараж\/Ремонт\]\]/);
   const versions=advanced.history(s.history,from);
   assert.equal(versions.length,1);
   assert.equal(advanced.readVersion(s.history,from,versions[0].id).content,first);
-  assert.throws(()=>insights.accept(s.notes,s.history,s.canvas,{from,to,expectedSha:insights.sha(first)}),{status:409});
+  assert.throws(()=>insights.accept(s.notes,s.history,s.canvas,{from,to,expectedSha:insights.sha(first),targetSha:insights.sha(knowledge.read(s.notes,to).content)}),{status:409});
   assert.equal(advanced.history(s.history,from).length,1);
 }));
 test("stale approvals, unknown and self links are rejected without modifying notes",()=>fixture(s=>{
@@ -88,11 +88,11 @@ test("stale approvals, unknown and self links are rejected without modifying not
   knowledge.save(s.notes,from,a+"\nИзменение другого окна");
   const latest=knowledge.read(s.notes,from).content;
   assert.throws(()=>insights.accept(s.notes,s.history,s.canvas,{
-    from,to:"Гараж/Ремонт.md",expectedSha:stale}),{status:409});
+    from,to:"Гараж/Ремонт.md",expectedSha:stale,targetSha:insights.sha(knowledge.read(s.notes,"Гараж/Ремонт.md").content)}),{status:409});
   assert.throws(()=>insights.accept(s.notes,s.history,s.canvas,{
-    from,to:from,expectedSha:insights.sha(latest)}),{status:400});
+    from,to:from,expectedSha:insights.sha(latest),targetSha:insights.sha(latest)}),{status:400});
   assert.throws(()=>insights.accept(s.notes,s.history,s.canvas,{
-    from,to:"../unknown.md",expectedSha:insights.sha(latest)}),{status:400});
+    from,to:"../unknown.md",expectedSha:insights.sha(latest),targetSha:insights.sha(latest)}),{status:400});
   assert.equal(knowledge.read(s.notes,from).content,latest);
 }));
 test("empty vault and bounded analysis remain deterministic with no writes",()=>fixture(s=>{
@@ -125,11 +125,11 @@ test("HTTP endpoints are local only and do not expose core sources",async()=>{
     const data=await r.json(),candidate=data.suggestions[0];
     assert.ok(candidate);
     r=await post("/api/knowledge/insights/accept",{
-      from:candidate.from,to:candidate.to,expectedSha:candidate.sourceSha
+      from:candidate.from,to:candidate.to,expectedSha:candidate.sourceSha,targetSha:candidate.targetSha
     },"https://external.example");
     assert.equal(r.status,403);
     r=await post("/api/knowledge/insights/accept",{
-      from:candidate.from,to:candidate.to,expectedSha:candidate.sourceSha
+      from:candidate.from,to:candidate.to,expectedSha:candidate.sourceSha,targetSha:candidate.targetSha
     });
     assert.equal(r.status,200);
     r=await fetch(origin+"/api/knowledge/insights");
