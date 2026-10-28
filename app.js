@@ -247,6 +247,16 @@
   dom.importFile.addEventListener("change", importCatalog);
   dom.dialog.addEventListener("close", () => { editingId = null; });
 
+  window.addEventListener("amayurena:avatar-action", event => {
+    const action = event.detail && event.detail.action;
+    if (action === "agents-chat") {
+      navigate("agents");
+      if (agents.length) openWorkspace(agents[0].id);
+      else showToast("Сначала создайте первого агента для чата.");
+      return;
+    }
+    if (action === "agents" || action === "home") navigate(action);
+  });
   window.AmayurenaWorkspace.init(() => navigate("agents"));
   agents = readCatalog();
   navigate(location.hash.slice(1));

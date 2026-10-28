@@ -16,6 +16,8 @@ jobs:
           node --check agents-core.js
           node --check app.js
           node --check workspace.js
+          node --check avatar.js
+          node --check avatar-assets.js
           node --check server.js
           node --check server-core.js
           node --check tests/agents.test.cjs

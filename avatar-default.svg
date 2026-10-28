@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" role="img" aria-label="Амaюрэна — лисица">
+<defs>
+<radialGradient id="g"><stop stop-color="#fff4d7"/><stop offset=".75" stop-color="#f3c967"/><stop offset="1" stop-color="#d49b44"/></radialGradient>
+<linearGradient id="h" x1="0" x2=".7" y2="1"><stop stop-color="#fffaf0"/><stop offset=".5" stop-color="#f6e1ae"/><stop offset="1" stop-color="#c78f39"/></linearGradient>
+<linearGradient id="d"><stop stop-color="#fdf8f0"/><stop offset="1" stop-color="#f4d9ac"/></linearGradient>
+<filter id="sh"><feGaussianBlur stdDeviation="4"/></filter>
+</defs>
+<g opacity=".65" stroke="#deb45c" stroke-width="4" fill="url(#h)">
+<path d="M175 334C10 235 16 70 65 44C59 173 213 152 185 303Z"/>
+<path d="M176 364C-5 351 0 177 47 138C38 270 206 265 192 351Z"/>
+<path d="M180 396C-6 444 36 294 54 268C57 378 218 321 190 391Z"/>
+<path d="M326 334C490 235 483 70 435 44C441 173 288 152 315 303Z"/>
+<path d="M326 364C504 351 500 177 454 138C462 270 293 265 310 351Z"/>
+<path d="M323 396C504 444 464 294 447 268C445 378 285 321 314 391Z"/>
+<path d="M250 313C103 209 185 25 250 6C314 25 396 210 250 313Z"/>
+</g>
+<path d="M121 425Q147 341 205 330L250 367L295 330Q353 340 379 425L400 493H100Z" fill="#27211f" stroke="#b98a46" stroke-width="8"/>
+<path d="M172 350Q207 380 250 404Q295 380 330 348L367 483H132Z" fill="url(#d)" stroke="#d1a050" stroke-width="5"/>
+<path d="M162 195Q123 100 154 42Q206 64 224 126Z" fill="url(#h)" stroke="#c78a35" stroke-width="7"/>
+<path d="M336 195Q375 100 346 42Q297 64 276 126Z" fill="url(#h)" stroke="#c78a35" stroke-width="7"/>
+<path d="M172 168Q158 107 167 78Q190 100 196 145Z" fill="#f7bba6"/>
+<path d="M327 168Q341 107 332 78Q309 100 304 145Z" fill="#f7bba6"/>
+<path d="M148 272C132 188 157 112 250 102C344 112 369 188 352 272Q365 327 309 371L250 388L191 371Q135 327 148 272Z" fill="url(#h)" stroke="#ca994f" stroke-width="5"/>
+<ellipse cx="250" cy="249" rx="82" ry="109" fill="#ffead0"/>
+<path d="M166 203Q159 134 212 116Q254 90 306 121Q349 150 343 203Q305 165 294 152Q246 196 187 195Z" fill="url(#h)"/>
+<path d="M161 207Q158 305 126 380Q169 371 197 331L184 212Z" fill="url(#h)"/>
+<path d="M339 207Q342 305 373 380Q330 371 303 331L318 212Z" fill="url(#h)"/>
+<path d="M193 232q19-13 36 2m42 0q17-15 36-2" stroke="#9b662d" stroke-width="7" fill="none" stroke-linecap="round"/>
+<ellipse cx="217" cy="240" rx="9" ry="12" fill="#ad661b"/>
+<ellipse cx="284" cy="240" rx="9" ry="12" fill="#ad661b"/>
+<circle cx="220" cy="237" r="3" fill="#fff7db"/><circle cx="286" cy="237" r="3" fill="#fff7db"/>
+<path d="M247 280q5 4 9 0m-26 25q20 17 40 0" stroke="#bf7e63" stroke-width="4" fill="none" stroke-linecap="round"/>
+<ellipse cx="189" cy="283" rx="16" ry="9" fill="#f9b5a7" opacity=".45"/>
+<ellipse cx="312" cy="283" rx="16" ry="9" fill="#f9b5a7" opacity=".45"/>
+<path d="M156 157q26 27 35 40m150-40q-26 27-35 40" stroke="#ecd29a" stroke-width="8" fill="none"/>
+<g fill="#e3bb62" stroke="#996e28" stroke-width="3">
+<path d="M183 142l14-19 14 19-14 19Z"/><path d="M290 142l14-19 14 19-14 19Z"/>
+<circle cx="250" cy="390" r="14"/><circle cx="250" cy="390" r="6" fill="#fff6da"/>
+</g>
+</svg>

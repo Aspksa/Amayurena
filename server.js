@@ -12,6 +12,10 @@ const STATIC_FILES = Object.freeze({
   "/index.html": ["index.html", "text/html; charset=utf-8"],
   "/styles.css": ["styles.css", "text/css; charset=utf-8"],
   "/workspace.css": ["workspace.css", "text/css; charset=utf-8"],
+  "/avatar.css": ["avatar.css", "text/css; charset=utf-8"],
+  "/avatar.js": ["avatar.js", "text/javascript; charset=utf-8"],
+  "/avatar-assets.js": ["avatar-assets.js", "text/javascript; charset=utf-8"],
+  "/avatar-default.svg": ["avatar-default.svg", "image/svg+xml"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/agents-core.js": ["agents-core.js", "text/javascript; charset=utf-8"],
   "/workspace.js": ["workspace.js", "text/javascript; charset=utf-8"]
@@ -90,14 +94,15 @@ function createServer(options = {}) {
       } finally { busy--; }
     }
     if (req.method === "GET" || req.method === "HEAD") {
-      const file = STATIC_FILES[pathname];
+      const imageMatch = /^\/assets\/avatars\/(pose-0[1-9]|pose-10)\.webp$/.exec(pathname);
+      const file = STATIC_FILES[pathname] || (imageMatch ? [path.join("assets", "avatars", imageMatch[1] + ".webp"), "image/webp"] : null);
       if (file) {
         const filename = path.join(BASE_DIR, file[0]);
         try {
           const data = fs.readFileSync(filename);
           res.writeHead(200, { "Content-Type": file[1], "Cache-Control": "no-store" });
           return res.end(req.method === "HEAD" ? undefined : data);
-        } catch (_) { return json(res, 500, { error: "Файл приложения недоступен." }); }
+        } catch (_) { return json(res, imageMatch ? 404 : 500, { error: imageMatch ? "Изображение ещё не загружено." : "Файл приложения недоступен." }); }
       }
     }
     return json(res, 404, { error: "Не найдено." });
