@@ -338,5 +338,11 @@
         element.addEventListener("click", () => show(element.dataset.knowledgeMode));
     }
   }
-  window.AmayurenaKnowledgeAdvanced = { init, show, update, renderHistory };
+  async function savePending() {
+    await canvasSave();
+    if (canvas.board && canvas.dirty > canvas.saved) {
+      throw new Error("Изменения Canvas не сохранены. Операция отменена.");
+    }
+  }
+  window.AmayurenaKnowledgeAdvanced = { init, show, update, renderHistory, savePending };
 })();

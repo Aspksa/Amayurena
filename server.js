@@ -9,6 +9,7 @@ const avatarInstaller = require("./avatar-package");
 const avatarPublisher = require("./avatar-publisher");
 const knowledge = require("./knowledge-core");
 const knowledgeAdvanced = require("./knowledge-advanced-core");
+const knowledgeMaintenance = require("./knowledge-maintenance");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -90,6 +91,9 @@ function createServer(options = {}) {
   const knowledgeRoot = options.knowledgeDirectory || path.join(BASE_DIR, "data", "knowledge");
   const historyRoot = options.knowledgeHistoryDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".history") : path.join(BASE_DIR, "data", "knowledge-history"));
   const canvasRoot = options.knowledgeCanvasDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".canvases") : path.join(BASE_DIR, "data", "canvases"));
+  const maintenanceRoot = options.knowledgeDataDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".workspace") : path.join(BASE_DIR, "data"));
+  const maintenance = { notesRoot: knowledgeRoot, historyRoot, canvasRoot,
+    trashRoot: path.join(maintenanceRoot, "trash"), backupsRoot: path.join(maintenanceRoot, "backups") };
   let busy = 0;
   let avatarPublishing = false;
   return http.createServer(async (req, res) => {
@@ -115,6 +119,57 @@ function createServer(options = {}) {
     if (pathname === "/api/knowledge" && req.method === "GET") {
       try { return json(res, 200, knowledge.list(knowledgeRoot)); }
       catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка чтения базы знаний." }); }
+    }
+    if (pathname === "/api/knowledge/search" && req.method === "GET") {
+      try {
+        const q = new URL(req.url, "http://localhost").searchParams.get("q");
+        return json(res, 200, knowledgeMaintenance.search(knowledgeRoot, q));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка поиска." }); }
+    }
+    if (pathname === "/api/knowledge/trash" && req.method === "GET") {
+      try { return json(res, 200, { items: knowledgeMaintenance.trashList(maintenance) }); }
+      catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Корзина недоступна." }); }
+    }
+    if (pathname === "/api/knowledge/trash/restore" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        return json(res, 200, knowledgeMaintenance.trashRestore(maintenance, body && body.id));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось восстановить заметку." }); }
+    }
+    if (pathname === "/api/knowledge/backups" && req.method === "GET") {
+      try { return json(res, 200, { items: knowledgeMaintenance.backups(maintenance) }); }
+      catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось прочитать копии." }); }
+    }
+    if (pathname === "/api/knowledge/backup/create" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        if (!body || body.confirm !== "CREATE_BACKUP") return json(res, 400, { error: "Подтвердите создание копии." });
+        return json(res, 201, knowledgeMaintenance.backup(maintenance));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось создать копию." }); }
+    }
+    if (pathname === "/api/knowledge/backup/restore" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        if (!body || body.confirm !== "RESTORE_BACKUP") return json(res, 400, { error: "Подтвердите восстановление." });
+        return json(res, 200, knowledgeMaintenance.restoreBackup(maintenance, body.id));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось восстановить копию." }); }
+    }
+    if (pathname === "/api/knowledge/note/move" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        return json(res, 200, knowledgeMaintenance.renameNote(maintenance, body && body.from, body && body.to));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось переместить заметку." }); }
+    }
+    if (pathname === "/api/knowledge/folder/move" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
+        const body = await readJson(req);
+        return json(res, 200, knowledgeMaintenance.moveFolder(maintenance, body && body.from, body && body.to));
+      } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось переместить папку." }); }
     }
     if (pathname === "/api/knowledge/graph" && req.method === "GET") {
       try { return json(res, 200, knowledge.graph(knowledgeRoot)); }
@@ -167,11 +222,23 @@ function createServer(options = {}) {
     if (pathname === "/api/knowledge/note" && ["GET", "POST", "DELETE"].includes(req.method)) {
       try {
         const search = new URL(req.url, "http://localhost").searchParams;
-        if (req.method === "GET") return json(res, 200, knowledge.read(knowledgeRoot, search.get("path")));
-        if (req.method === "DELETE") return json(res, 200, knowledgeAdvanced.deleteNote(knowledgeRoot, historyRoot, search.get("path")));
+        if (req.method === "GET") {
+          const note = knowledge.read(knowledgeRoot, search.get("path"));
+          return json(res, 200, { ...note, sha: knowledgeMaintenance.sha(note.content) });
+        }
+        if (req.method === "DELETE") return json(res, 200, knowledgeMaintenance.trashNote(maintenance, search.get("path")));
         if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON-запрос." });
         const body = await readJson(req);
-        return json(res, 200, knowledgeAdvanced.saveNote(knowledgeRoot, historyRoot, body && body.path, body && body.content));
+        if (body && typeof body.expectedSha === "string") {
+          let current;
+          try { current = knowledge.read(knowledgeRoot, body.path).content; }
+          catch (e) { if (e.status !== 404) throw e; throw knowledge.problem("Заметка была удалена или перемещена. Сохранение отменено.", 409); }
+          if (knowledgeMaintenance.sha(current) !== body.expectedSha) {
+            throw knowledge.problem("Заметка изменена в другом окне. Ваши изменения не перезаписаны.", 409);
+          }
+        }
+        const result = knowledgeAdvanced.saveNote(knowledgeRoot, historyRoot, body && body.path, body && body.content);
+        return json(res, 200, { ...result, sha: knowledgeMaintenance.sha(body.content) });
       } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка работы с заметкой." }); }
     }
     if (pathname === "/api/knowledge/folder" && req.method === "POST") {
