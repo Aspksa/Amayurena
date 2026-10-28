@@ -72,6 +72,18 @@ test("group-aware auto-layout is deterministic, bounded and preserves edges/cont
   assert.equal(a.nodes.find(n=>n.id==="a").groupId,"g");
   assert.equal(a.nodes.find(n=>n.id==="c").text,"Текст c");
 });
+test("auto-layout keeps sixty grouped cards within a single large group",()=>{
+  const input={name:"Большая доска",groups:[group("g")],
+    nodes:Array.from({length:60},(_,i)=>({...card("n"+i,0,0),groupId:"g"})),edges:[]};
+  const arranged=layout.arrange(input);
+  const g=arranged.groups[0];
+  assert.ok(g.x+g.width<=layout.WIDTH && g.y+g.height<=layout.HEIGHT);
+  for(const n of arranged.nodes){
+    assert.ok(n.x>=g.x && n.x+layout.CARD_W<=g.x+g.width);
+    assert.ok(n.y>=g.y && n.y+layout.CARD_H<=g.y+g.height);
+  }
+  assert.equal(new Set(arranged.nodes.map(n=>n.x+":"+n.y)).size,60);
+});
 test("zoom/clamped viewport and minimap coordinate math work for large boards",()=>{
   assert.equal(layout.zoom(.01),.35);
   assert.equal(layout.zoom(5),2);
