@@ -581,6 +581,21 @@
     $("knowledge-bases-search").addEventListener("input", renderBases);
     $("knowledge-bases-property").addEventListener("change", renderBases);
     $("knowledge-bases-value").addEventListener("input", renderBases);
+
+    for (const id of ["knowledge-bases-sort","knowledge-bases-direction",
+      "knowledge-bases-group","knowledge-bases-layout"]) {
+      $(id).addEventListener("change", renderBases);
+    }
+    $("knowledge-bases-views").addEventListener("change",event=>{
+      basesState.currentView=event.target.value;
+      const view=basesState.views.find(item=>item.id===basesState.currentView);
+      if (view) applyView(view); else renderBases();
+      renderViewSelect();
+    });
+    $("knowledge-bases-save-view").addEventListener("click",()=>{void saveView();});
+    $("knowledge-bases-delete-view").addEventListener("click",()=>{void deleteView();});
+    $("knowledge-bases-add-field").addEventListener("click",()=>{void createField();});
+
     $("knowledge-history-close").addEventListener("click", () => $("knowledge-history-dialog").close());
     for (const element of document.querySelectorAll("[data-knowledge-mode]")) {
       if (["canvas", "bases"].includes(element.dataset.knowledgeMode))
