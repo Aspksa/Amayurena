@@ -4,11 +4,13 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const core = require("./knowledge-core");
 const advanced = require("./knowledge-advanced-core");
+const attachments = require("./knowledge-attachments");
 
 const MAX_BACKUP_BYTES = 256 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 200;
 const LEGACY_VOLUMES = ["knowledge", "history", "canvases", "trash"];
-const VOLUMES = [...LEGACY_VOLUMES, "bases"];
+const FIVE_VOLUMES = [...LEGACY_VOLUMES, "bases"];
+const VOLUMES = [...FIVE_VOLUMES, "attachments"];
 
 function fail(message, status = 400) { return Object.assign(new Error(message), { status }); }
 function safeDir(dir) {
@@ -39,7 +41,8 @@ function atomicJson(file, value) {
 function stores(spec) {
   return {
     knowledge: spec.notesRoot, history: spec.historyRoot, canvases: spec.canvasRoot,
-    trash: spec.trashRoot, bases: spec.basesRoot || path.join(path.dirname(spec.notesRoot), ".knowledge-bases"), backups: spec.backupsRoot
+    trash: spec.trashRoot, bases: spec.basesRoot || path.join(path.dirname(spec.notesRoot), ".knowledge-bases"),
+    attachments: spec.attachmentsRoot || path.join(path.dirname(spec.notesRoot),"knowledge-attachments"), backups: spec.backupsRoot
   };
 }
 function search(notesRoot, raw) {
@@ -64,14 +67,20 @@ function search(notesRoot, raw) {
 function entryFile(trashRoot, id) { return path.join(safeDir(trashRoot), safeName(id) + ".json"); }
 function trashNote(spec, requested) {
   const note = core.read(spec.notesRoot, requested);
+  const attachDir=stores(spec).attachments;
+  attachments.listAll(attachDir);
   const id = Date.now().toString().padStart(13, "0") + "-" + crypto.randomUUID();
   const entry = { id, path: note.path, deletedAt: new Date().toISOString(), content: note.content };
   atomicJson(entryFile(spec.trashRoot, id), entry);
   try {
     // History remains available even after deletion; the trash entry is the primary recovery source.
     advanced.deleteNote(spec.notesRoot, spec.historyRoot, note.path);
+    attachments.detach(attachDir,note.path,id);
   } catch (error) {
-    fs.unlinkSync(entryFile(spec.trashRoot, id));
+    // Never discard the only recoverable copy after the note was already deleted.
+    let intact=false;
+    try { core.read(spec.notesRoot,note.path); intact=true; } catch(_){}
+    if(intact&&fs.existsSync(entryFile(spec.trashRoot,id)))fs.unlinkSync(entryFile(spec.trashRoot,id));
     throw error;
   }
   return { id, path: note.path, deletedAt: entry.deletedAt };
@@ -92,7 +101,10 @@ function trashRestore(spec, id) {
   safeFile(file);
   const item = JSON.parse(fs.readFileSync(file, "utf8"));
   if (item.id !== id) throw fail("Запись корзины повреждена.");
+  const attachDir=stores(spec).attachments;
+  attachments.listAll(attachDir);
   const result = core.create(spec.notesRoot, item.path, item.content);
+  attachments.reattach(attachDir,id,item.path);
   fs.unlinkSync(file);
   return result;
 }
@@ -177,8 +189,10 @@ function renameNote(spec, oldPath, nextPath) {
     if (!fs.lstatSync(at).isDirectory() || fs.lstatSync(at).isSymbolicLink()) throw fail("Небезопасная папка.");
   }
   preflightHistory(spec, [[from, to]]);
+  attachments.listAll(stores(spec).attachments);
   fs.renameSync(source, dest);
   rebaseHistory(spec, [[from, to]]);
+  attachments.move(stores(spec).attachments,[[from,to]]);
   return { from, to, ...updateReferences(spec, [[from, to]]) };
 }
 function moveFolder(spec, oldPath, nextPath) {
@@ -212,8 +226,10 @@ function moveFolder(spec, oldPath, nextPath) {
     .filter(note => note.path.startsWith(from + "/"))
     .map(note => [note.path, to + note.path.slice(from.length)]);
   preflightHistory(spec, moved);
+  attachments.listAll(stores(spec).attachments);
   fs.renameSync(source, dest);
   rebaseHistory(spec, moved);
+  attachments.move(stores(spec).attachments,moved);
   return { from, to, moved: moved.length, ...updateReferences(spec, moved) };
 }
 function copyTree(src, dst, report, rel = "") {
@@ -283,8 +299,12 @@ function backups(spec) {
 }
 function restoreBackup(spec, id) {
   const { folder, manifest } = verifyBackup(spec, id);
-  const volumes = Array.isArray(manifest.volumes) && manifest.volumes.length === VOLUMES.length &&
-    manifest.volumes.every((name,i) => name === VOLUMES[i]) ? VOLUMES : LEGACY_VOLUMES;
+  const declared=manifest.volumes;
+  const supported=[VOLUMES,FIVE_VOLUMES,LEGACY_VOLUMES];
+  const volumes=supported.find(list=>Array.isArray(declared)&&declared.length===list.length&&
+    declared.every((name,i)=>name===list[i]))||
+    (declared===undefined?LEGACY_VOLUMES:null);
+  if(!volumes)throw fail("Неизвестный состав томов резервной копии.");
   const dirs = stores(spec);
   const stage = {}, previous = {}, installed = [];
   const key = crypto.randomUUID();

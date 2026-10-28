@@ -253,6 +253,14 @@
               <button id="knowledge-editor-sync" type="button" class="btn btn-soft" aria-pressed="true">Связать прокрутку</button>
               <button id="knowledge-editor-outline-toggle" type="button" class="btn btn-soft" aria-pressed="true">Оглавление</button>
             </div>
+            <section id="knowledge-attachment-panel" class="knowledge-attachment-panel" aria-label="Вложения заметки">
+              <div class="knowledge-attachment-heading"><strong>Вложения</strong>
+                <button type="button" id="knowledge-attachment-add" class="btn btn-soft">＋ Прикрепить файл</button>
+                <input type="file" id="knowledge-attachment-file" hidden accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.xlsx,.xls,.docx">
+              </div>
+              <div id="knowledge-attachment-items" class="knowledge-attachment-items" aria-live="polite"></div>
+              <p id="knowledge-attachment-status" role="status" class="knowledge-attachment-status">Файлы хранятся локально, отдельно от текста заметки.</p>
+            </section>
             <div class="knowledge-editor-layout" id="knowledge-editor-layout">
               <div class="knowledge-editor-text-pane">
                 <label for="knowledge-editor">Markdown <span id="knowledge-editor-line-count" class="knowledge-editor-meta"></span></label>

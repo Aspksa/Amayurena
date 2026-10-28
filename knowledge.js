@@ -319,6 +319,56 @@
         ui.editor.scrollHeight,ui.editor.clientHeight);
     }finally{syncingEditorScroll=false;}
   }
+  async function loadAttachments(){
+    const box=$("knowledge-attachment-items");
+    box.replaceChildren();
+    if(!active)return;
+    const current=active;
+    try{
+      const items=await request("/api/knowledge/attachments?path="+encodeURIComponent(current));
+      if(active!==current)return;
+      if(!items.items.length){
+        box.append(node("span","knowledge-placeholder","Вложений пока нет."));return;
+      }
+      for(const attachment of items.items){
+        const row=node("div","knowledge-attachment-row");
+        const name=node("span","",attachment.name+" · "+Math.ceil(attachment.bytes/1024)+" КиБ");
+        const download=node("button","btn btn-soft","Сохранить файл");
+        download.type="button";
+        download.addEventListener("click",()=>{
+          const anchor=document.createElement("a");
+          anchor.href="/api/knowledge/attachment?id="+encodeURIComponent(attachment.id);
+          anchor.download=attachment.name;
+          document.body.append(anchor);anchor.click();anchor.remove();
+        });
+        row.append(name,download);box.append(row);
+      }
+    }catch(e){
+      if(active===current)$("knowledge-attachment-status").textContent="Не удалось прочитать вложения: "+e.message;
+    }
+  }
+  async function uploadAttachment(){
+    const file=$("knowledge-attachment-file").files?.[0];
+    $("knowledge-attachment-file").value="";
+    if(!file||!active)return;
+    if(file.size===0||file.size>5*1024*1024){
+      $("knowledge-attachment-status").textContent="Файл должен быть от 1 байта до 5 МиБ.";return;
+    }
+    const path=active;
+    try{
+      await beforeMutation();
+      if(active!==path)throw Error("За время загрузки изменилась заметка.");
+      $("knowledge-attachment-status").textContent="Загружаю файл на локальный сервер…";
+      const params=new URLSearchParams({path,name:file.name});
+      const response=await fetch("/api/knowledge/attachment?"+params.toString(),{
+        method:"POST",headers:{"Content-Type":"application/octet-stream"},body:await file.arrayBuffer()
+      });
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||"HTTP "+response.status);
+      $("knowledge-attachment-status").textContent="Прикреплено: "+result.name;
+      await loadAttachments();
+    }catch(e){$("knowledge-attachment-status").textContent="Вложение не сохранено: "+e.message;}
+  }
   function renderPreview() {
     window.AmayurenaMarkdown.render(ui.preview, ui.editor.value,
       target => resolveLink(active, target), path => { void openNote(path); });
@@ -469,6 +519,7 @@
       renderTree(); renderPreview(); renderBacklinks(); renderGraph(); renderTabs(); renderBreadcrumbs(); updateActions();
       void window.AmayurenaKnowledgeAdvanced.update(notes, active);
       setMode("editor");
+      void loadAttachments();
       if (revision) {
         keepDraft(record.path, ui.editor.value);
         message("Восстановлен черновик. Нажмите «Сохранить».");
@@ -820,6 +871,8 @@
       }
       ui.editor.addEventListener("scroll",syncEditorToPreview,{passive:true});
       ui.preview.addEventListener("scroll",syncPreviewToEditor,{passive:true});
+      $("knowledge-attachment-add").addEventListener("click",()=>$("knowledge-attachment-file").click());
+      $("knowledge-attachment-file").addEventListener("change",()=>{void uploadAttachment();});
       ui.editor.addEventListener("input", scheduleSave);
       ui.editor.addEventListener("keydown", e => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void saveNow(); }
