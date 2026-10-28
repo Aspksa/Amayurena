@@ -6,3 +6,6 @@ Amayurena.private.cmd
 *.local.cmd
 node_modules/
 coverage/
+
+# Local knowledge vault (private Markdown files)
+data/
