@@ -9,9 +9,12 @@
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./workspace.css">
   <link rel="stylesheet" href="./knowledge.css">
+  <link rel="stylesheet" href="./knowledge-advanced.css">
   <link rel="stylesheet" href="./avatar.css">
   <script defer src="./agents-core.js"></script>
   <script defer src="./workspace.js"></script>
+  <script defer src="./knowledge-markdown.js"></script>
+  <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge.js"></script>
   <script defer src="./app.js"></script>
   <script defer src="./avatar-assets.js"></script>
@@ -155,7 +158,11 @@
         </div>
         <div class="knowledge-toolbar">
           <span id="knowledge-stats" class="knowledge-summary">Загрузка…</span>
-          <button id="knowledge-mode" data-current="editor" class="btn btn-soft" type="button">Граф</button>
+          <div class="knowledge-editor-controls">
+            <button id="knowledge-mode" data-current="editor" data-knowledge-mode="graph" class="btn btn-soft" type="button">Граф</button>
+            <button id="knowledge-canvas-tab" data-knowledge-mode="canvas" class="btn btn-soft" type="button">Canvas</button>
+            <button id="knowledge-bases-tab" data-knowledge-mode="bases" class="btn btn-soft" type="button">Bases</button>
+          </div>
         </div>
         <div class="knowledge-layout">
           <aside class="knowledge-sidebar" aria-label="Файлы базы знаний">
@@ -190,9 +197,45 @@
             <p class="knowledge-tip">Нажмите на узел, чтобы открыть заметку. На карте показаны первые 80 заметок.</p>
             <svg id="knowledge-graph" class="knowledge-graph" role="img" aria-label="Граф заметок и ссылок" viewBox="0 0 900 580"></svg>
           </section>
-          <aside class="knowledge-inspector" aria-label="Связи заметки">
+          <section id="knowledge-canvas-panel" class="knowledge-canvas-panel" hidden aria-label="Интерактивная доска Canvas">
+            <h3>Canvas — доска идей</h3>
+            <p class="knowledge-advanced-help">Создавайте карточки текста и заметок, перемещайте их мышью или касанием, связывайте друг с другом. Изменения сохраняются локально.</p>
+            <div class="knowledge-advanced-toolbar">
+              <label class="sr-only" for="knowledge-canvas-select">Выбор доски</label>
+              <select id="knowledge-canvas-select"></select>
+              <button id="knowledge-canvas-new" class="btn btn-primary" type="button">＋ Доска</button>
+              <button id="knowledge-canvas-text" class="btn btn-soft" type="button">＋ Текст</button>
+              <button id="knowledge-canvas-file" class="btn btn-soft" type="button">＋ Заметка</button>
+              <button id="knowledge-canvas-save" class="btn btn-soft" type="button">Сохранить</button>
+              <button id="knowledge-canvas-delete" class="btn btn-danger" type="button">Удалить доску</button>
+            </div>
+            <div class="knowledge-canvas-viewport" aria-label="Рабочая область Canvas" tabindex="0">
+              <div class="knowledge-canvas-surface">
+                <svg id="knowledge-canvas-edges" class="knowledge-canvas-edges" viewBox="0 0 3500 2600" aria-hidden="true"></svg>
+                <div id="knowledge-canvas-nodes" class="knowledge-canvas-nodes"></div>
+              </div>
+            </div>
+            <div id="knowledge-canvas-status" class="knowledge-canvas-status" role="status">Создайте доску, чтобы начать.</div>
+          </section>
+          <section id="knowledge-bases-panel" class="knowledge-bases-panel" hidden aria-label="Таблица Bases">
+            <h3>Bases — свойства заметок</h3>
+            <p class="knowledge-advanced-help">Таблица строится автоматически из метаданных в начале Markdown-файлов (frontmatter). Нажмите строку, чтобы открыть заметку.</p>
+            <div class="knowledge-advanced-toolbar">
+              <label class="sr-only" for="knowledge-bases-search">Поиск по таблице</label>
+              <input id="knowledge-bases-search" type="search" placeholder="Поиск по заметкам…">
+              <label for="knowledge-bases-property" class="knowledge-advanced-help">Поле:</label>
+              <select id="knowledge-bases-property"></select>
+              <label class="sr-only" for="knowledge-bases-value">Фильтр по значению поля</label>
+              <input id="knowledge-bases-value" type="search" placeholder="Значение поля…">
+            </div>
+            <p id="knowledge-bases-count" class="knowledge-advanced-help"></p>
+            <div class="knowledge-bases-wrap" id="knowledge-bases-table"></div>
+          </section>
+          <aside id="knowledge-inspector" class="knowledge-inspector" aria-label="Связи заметки">
             <h3>Обратные ссылки</h3>
             <div id="knowledge-backlinks" class="knowledge-backlinks"></div>
+            <h3>История заметки</h3>
+            <div id="knowledge-history" class="knowledge-backlinks"></div>
             <p class="knowledge-tip">Вставьте в текст [[Название заметки]] или [[Папка/Заметка]] для создания связи. Ctrl+S — сохранение.</p>
             <div id="knowledge-status" class="knowledge-status" role="status" aria-live="polite"></div>
           </aside>
@@ -202,6 +245,13 @@
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </main>
   </div>
+
+  <dialog id="knowledge-history-dialog" class="knowledge-history-dialog" aria-labelledby="knowledge-history-heading">
+    <h2 id="knowledge-history-heading">Предыдущая версия</h2>
+    <p class="knowledge-advanced-help">Содержимое доступно только для чтения. Для восстановления используйте кнопку «Вернуть» в истории.</p>
+    <textarea id="knowledge-history-content" readonly aria-label="Содержимое предыдущей версии"></textarea>
+    <button id="knowledge-history-close" type="button" class="btn btn-soft">Закрыть</button>
+  </dialog>
 
   <dialog id="agent-dialog" aria-labelledby="dialog-heading">
     <form id="agent-form" novalidate>

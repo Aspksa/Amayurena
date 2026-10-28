@@ -93,36 +93,8 @@
     if (last < line.length) parent.append(document.createTextNode(line.slice(last)));
   }
   function renderPreview() {
-    ui.preview.replaceChildren();
-    const content = ui.editor.value;
-    const lines = content.split(/\r?\n/);
-    let block = [];
-    function flush() {
-      if (!block.length) return;
-      const paragraph = node("p");
-      block.forEach((line, i) => {
-        if (i) paragraph.append(document.createElement("br"));
-        appendInline(paragraph, line);
-      });
-      ui.preview.append(paragraph);
-      block = [];
-    }
-    for (const line of lines) {
-      if (!line.trim()) { flush(); continue; }
-      const heading = /^(#{1,6})\s+(.+)$/.exec(line);
-      if (heading) {
-        flush();
-        const h = node("h" + heading[1].length);
-        appendInline(h, heading[2]);
-        ui.preview.append(h);
-      } else if (/^\s*[-*]\s+/.test(line)) {
-        flush();
-        const p = node("p", "knowledge-list-line");
-        appendInline(p, "• " + line.replace(/^\s*[-*]\s+/, ""));
-        ui.preview.append(p);
-      } else block.push(line);
-    }
-    flush();
+    window.AmayurenaMarkdown.render(ui.preview, ui.editor.value,
+      target => resolveLink(active, target), path => { void openNote(path); });
   }
   function renderBacklinks() {
     ui.backlinks.replaceChildren();
@@ -185,6 +157,7 @@
     folders = list.folders;
     graph = links;
     renderTree(); renderBacklinks(); renderGraph();
+    void window.AmayurenaKnowledgeAdvanced.update(notes, active);
   }
   function scheduleSave() {
     if (!active) return;
@@ -208,10 +181,12 @@
     }).catch(error => { message("Ошибка сохранения: " + error.message, true); });
     return queue;
   }
-  async function openNote(path) {
-    if (path === active) return;
-    await saveNow();
-    if (active && revision > committed) return;
+  async function openNote(path, force = false) {
+    if (path === active && !force) { setMode("editor"); return; }
+    if (!force) {
+      await saveNow();
+      if (active && revision > committed) return;
+    }
     try {
       const record = await request("/api/knowledge/note?path=" + encodeURIComponent(path));
       active = record.path;
@@ -220,6 +195,7 @@
       ui.panel.hidden = false;
       revision = 0; committed = 0;
       renderTree(); renderPreview(); renderBacklinks(); renderGraph();
+      void window.AmayurenaKnowledgeAdvanced.update(notes, active);
       setMode("editor");
       message("Готово к редактированию");
     } catch (error) { message(error.message, true); }
@@ -281,11 +257,17 @@
     ui.graphPanel.hidden = !isGraph;
     ui.mode.dataset.current = isGraph ? "graph" : "editor";
     ui.mode.textContent = isGraph ? "Редактор" : "Граф";
+    window.AmayurenaKnowledgeAdvanced.show(isGraph ? "graph" : "editor");
     if (isGraph) renderGraph();
   }
   async function open() {
     if (!initialized) {
       initialized = true;
+      window.AmayurenaKnowledgeAdvanced.init({
+        onNoteOpen: openNote,
+        beforeRestore: async () => { await saveNow(); if (active && revision > committed) throw new Error("Текущие изменения не сохранены."); },
+        onReload: path => openNote(path, true)
+      });
       ui.editor.addEventListener("input", scheduleSave);
       ui.editor.addEventListener("keydown", e => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void saveNow(); }
