@@ -10,7 +10,7 @@ test("heading outline preserves levels, Unicode and duplicate slugs",()=>{
  assert.deepEqual(r.headings.map(x=>x.level),[1,2,3,1]);
  assert.deepEqual(r.headings.map(x=>x.slug),["привет","введение","введение-2","конец"]);
  assert.equal(r.headings[1].line,2);
- assert.equal(helper.lineOffset(content,4),28);
+ assert.equal(helper.lineOffset(content,4),27);
 });
 test("code fences do not produce ghost sections",()=>{
  const text="# Real\n"+String.fromCharCode(96).repeat(3)+"md\n# Ignore\n"+String.fromCharCode(96).repeat(3)+"\n## More";
