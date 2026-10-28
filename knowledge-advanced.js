@@ -376,6 +376,10 @@
     let savedZoom=1;
     try { savedZoom=Number(localStorage.getItem("amayu.canvas.zoom."+encodeURIComponent(name)))||1; }catch(_){}
     setZoom(savedZoom,false);renderCanvas();
+    if (canvas.board && (canvas.board.groups.length || canvas.board.nodes.length)) {
+      const first=canvas.board.groups[0] || canvas.board.nodes[0];
+      panTo(first.x+110,first.y+80);
+    } else panTo(380,270);
     canvasStatus(name?"Доска «"+name+"» загружена.":"Создайте доску Canvas.");
   }
   function navigateCanvas(fn) {
@@ -456,8 +460,11 @@
   function autoArrange() {
     if(!canvas.board||canvas.transitioning)return;
     if(!confirm("Автоматически расположить группы и карточки? Их текущие координаты изменятся."))return;
-    canvas.board=layout.arrange(canvas.board);
-    canvasChanged();renderCanvas();fitBoard();
+    try {
+      const arranged=layout.arrange(canvas.board);
+      canvas.board=arranged;
+      canvasChanged();renderCanvas();fitBoard();
+    } catch (e) { canvasStatus("Не удалось упорядочить: "+e.message); }
   }
 
   function basesStatus(text, bad = false) {
