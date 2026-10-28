@@ -7,7 +7,8 @@ const advanced = require("./knowledge-advanced-core");
 
 const MAX_BACKUP_BYTES = 256 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 200;
-const VOLUMES = ["knowledge", "history", "canvases", "trash"];
+const LEGACY_VOLUMES = ["knowledge", "history", "canvases", "trash"];
+const VOLUMES = [...LEGACY_VOLUMES, "bases"];
 
 function fail(message, status = 400) { return Object.assign(new Error(message), { status }); }
 function safeDir(dir) {
@@ -38,7 +39,7 @@ function atomicJson(file, value) {
 function stores(spec) {
   return {
     knowledge: spec.notesRoot, history: spec.historyRoot, canvases: spec.canvasRoot,
-    trash: spec.trashRoot, backups: spec.backupsRoot
+    trash: spec.trashRoot, bases: spec.basesRoot || path.join(spec.notesRoot, ".bases"), backups: spec.backupsRoot
   };
 }
 function search(notesRoot, raw) {
@@ -243,7 +244,7 @@ function backup(spec) {
   try {
     for (const name of VOLUMES) copyTree(dirs[name], path.join(pending, name), report, name);
     const manifest = { id, createdAt: new Date().toISOString(), count: report.files.length,
-      bytes: report.total, files: report.files };
+      bytes: report.total, volumes: VOLUMES, files: report.files };
     atomicJson(path.join(pending, "manifest.json"), manifest);
     fs.renameSync(pending, dest);
     return { id, createdAt: manifest.createdAt, count: manifest.count, bytes: manifest.bytes };
@@ -281,19 +282,21 @@ function backups(spec) {
     });
 }
 function restoreBackup(spec, id) {
-  const { folder } = verifyBackup(spec, id);
+  const { folder, manifest } = verifyBackup(spec, id);
+  const volumes = Array.isArray(manifest.volumes) && manifest.volumes.length === VOLUMES.length &&
+    manifest.volumes.every((name,i) => name === VOLUMES[i]) ? VOLUMES : LEGACY_VOLUMES;
   const dirs = stores(spec);
   const stage = {}, previous = {}, installed = [];
   const key = crypto.randomUUID();
   try {
     // Prepare all four volumes before touching live data.
-    for (const name of VOLUMES) {
+    for (const name of volumes) {
       stage[name] = dirs[name] + ".restore-" + key;
       previous[name] = dirs[name] + ".previous-" + key;
       if (fs.existsSync(stage[name]) || fs.existsSync(previous[name])) throw fail("Временная папка уже существует.");
       copyTree(path.join(folder, name), stage[name], { files: [], total: 0 }, name);
     }
-    for (const name of VOLUMES) {
+    for (const name of volumes) {
       if (fs.existsSync(dirs[name])) fs.renameSync(dirs[name], previous[name]);
       try { fs.renameSync(stage[name], dirs[name]); installed.push(name); }
       catch (error) {
@@ -301,7 +304,7 @@ function restoreBackup(spec, id) {
         throw error;
       }
     }
-    for (const name of VOLUMES) if (fs.existsSync(previous[name])) {
+    for (const name of volumes) if (fs.existsSync(previous[name])) {
       try { fs.rmSync(previous[name], { recursive: true, force: true }); }
       catch (_) { /* Recovery was installed successfully; preserve old copy on cleanup failure. */ }
     }
@@ -313,7 +316,7 @@ function restoreBackup(spec, id) {
     }
     throw error;
   } finally {
-    for (const name of VOLUMES) if (stage[name] && fs.existsSync(stage[name]))
+    for (const name of volumes) if (stage[name] && fs.existsSync(stage[name]))
       fs.rmSync(stage[name], { recursive: true, force: true });
   }
 }
