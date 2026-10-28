@@ -4,6 +4,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const vault = require("./knowledge-core");
 const advanced = require("./knowledge-advanced-core");
+const formulasCore = require("./knowledge-bases-math");
 const TYPES = ["text", "number", "date", "checkbox", "select", "tags"];
 const RESERVED = new Set(["title", "folder", "updatedAt", "__proto__", "prototype", "constructor"]);
 const fieldPattern = /^[a-zA-Zа-яА-ЯёЁ][\wа-яА-ЯёЁ-]{0,39}$/;
@@ -81,7 +82,7 @@ function patchProperty(noteRoot, historyRoot, notePath, key, type, value, expect
   const result=advanced.saveNote(noteRoot,historyRoot,notePath,next);
   return {path:result.path,sha:digest(next),key,type,value,unchanged:!!result.unchanged};
 }
-function defaults(){return {types:{},views:[]};}
+function defaults(){return {types:{},views:[],formulas:{}};}
 function validateSettings(data) {
   if (!data || typeof data!=="object" || Array.isArray(data) || !data.types || typeof data.types!=="object" ||
       Array.isArray(data.types) || !Array.isArray(data.views) || data.views.length>30) throw problem("Неверные настройки Bases.");
@@ -92,23 +93,38 @@ function validateSettings(data) {
     if (!TYPES.includes(value)) throw problem("Неизвестный тип поля.");
     types[key]=value;
   }
+  const formulas=Object.create(null);
+  if(data.formulas!==undefined && (!data.formulas||typeof data.formulas!=="object"||Array.isArray(data.formulas)||
+    Object.keys(data.formulas).length>20))throw problem("Неверные вычисляемые поля.");
+  for(const [name,expression] of Object.entries(data.formulas||{})){
+    safeField(name);
+    if(Object.hasOwn(types,name))throw problem("Вычисляемое поле совпадает с обычным.");
+    if(typeof expression!=="string"||expression.length>180)throw problem("Неверная формула.");
+    const identifiers=formulasCore.tokenize(expression).filter(t=>/^[a-zA-Zа-яА-ЯёЁ]/.test(t));
+    const values=Object.fromEntries(identifiers.map(key=>[formulasCore.validateField(key),1]));
+    try{formulasCore.evaluate(expression,values);}
+    catch(e){throw problem("Неверная формула "+name+": "+e.message);}
+    formulas[name]=expression;
+  }
   const ids=new Set(), views=[];
   for (const view of data.views) {
     if (!view || typeof view!=="object" || typeof view.id!=="string" ||
         !/^[a-z0-9-]{1,50}$/.test(view.id) || ids.has(view.id) ||
         typeof view.name!=="string" || !view.name.trim() || view.name.length>65 ||
-        !["table","cards"].includes(view.layout) ||
+        !["table","cards","calendar"].includes(view.layout) ||
         !["asc","desc"].includes(view.direction) ||
         typeof view.sort!=="string" || view.sort.length>40 ||
         typeof view.group!=="string" || view.group.length>40 ||
         typeof view.filterField!=="string" || view.filterField.length>40 ||
-        typeof view.filterValue!=="string" || view.filterValue.length>120) throw problem("Неверный сохранённый вид.");
+        typeof view.filterValue!=="string" || view.filterValue.length>120 ||
+        (view.filterOp!==undefined && !["contains","eq","neq","gt","gte","lt","lte"].includes(view.filterOp))) throw problem("Неверный сохранённый вид.");
     for (const name of [view.sort,view.group,view.filterField]) if (name && !RESERVED.has(name)) safeField(name);
     ids.add(view.id);
     views.push({id:view.id,name:view.name.trim(),layout:view.layout,sort:view.sort,
-      direction:view.direction,group:view.group,filterField:view.filterField,filterValue:view.filterValue});
+      direction:view.direction,group:view.group,filterField:view.filterField,filterValue:view.filterValue,
+      filterOp:view.filterOp||"contains"});
   }
-  return {types,views};
+  return {types,views,formulas};
 }
 function loadSettings(root) {
   const file=configPath(root);
