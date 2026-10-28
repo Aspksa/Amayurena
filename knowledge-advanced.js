@@ -11,6 +11,11 @@
   const canvas = { name: "", board: null, boards: [], pending: null, queue: Promise.resolve(),
     dirty: 0, saved: 0, connecting: "", timer: null };
   let historyToken = 0;
+  const basesState = { types: {}, views: [], sha: "", currentView: "", busy: false };
+  const basesTypes = ["text", "number", "date", "checkbox", "select", "tags"];
+  const basesBuiltin = ["title", "folder", "updatedAt"];
+  const basesReserved = new Set(["title", "folder", "updatedAt"]);
+
 
   async function api(endpoint, body, method) {
     const options = body === undefined ? { method: method || "GET" } : {
@@ -273,49 +278,310 @@
     canvasChanged(); renderCanvas();
   }
 
-  async function loadBases() {
-    const target = $("knowledge-bases-table");
-    try {
-      const data = await api("/api/knowledge/bases");
-      config.rows = data.rows || []; config.columns = data.columns || [];
-      const select = $("knowledge-bases-property"), selected = select.value;
-      select.replaceChildren();
-      for (const c of config.columns) { const option = mk("option", "", c); option.value = c; select.append(option); }
-      if (config.columns.includes(selected)) select.value = selected;
-      renderBases();
-    } catch (e) { target.replaceChildren(mk("p", "knowledge-placeholder", e.message)); }
+  function basesStatus(text, bad = false) {
+    const field = $("knowledge-bases-message");
+    field.textContent = text;
+    field.dataset.error = String(bad);
   }
   function cellValue(row, key) {
     const value = row[key] === undefined ? row.properties[key] : row[key];
     return Array.isArray(value) ? value.join(", ") : String(value ?? "");
   }
-  function renderBases() {
-    const container = $("knowledge-bases-table");
-    container.replaceChildren();
-    const phrase = $("knowledge-bases-search").value.toLocaleLowerCase("ru");
-    const field = $("knowledge-bases-property").value || "title";
-    const valueFilter = $("knowledge-bases-value").value.toLocaleLowerCase("ru");
-    const rows = config.rows.filter(row =>
-      (row.path + " " + Object.values(row.properties).join(" ")).toLocaleLowerCase("ru").includes(phrase) &&
-      cellValue(row, field).toLocaleLowerCase("ru").includes(valueFilter))
-      .sort((a, b) => cellValue(a, field).localeCompare(cellValue(b, field), "ru"));
-    $("knowledge-bases-count").textContent = rows.length + " из " + config.rows.length + " заметок · сортировка: " + field;
-    const table = mk("table", "knowledge-bases-grid"), thead = mk("thead"), header = mk("tr");
-    const cols = ["title", "folder", ...config.columns.filter(c => !["title", "folder", "updatedAt"].includes(c)), "updatedAt"];
-    for (const column of cols) header.append(mk("th", "", column === "title" ? "Заметка" : column === "folder" ? "Папка" : column === "updatedAt" ? "Изменено" : column));
-    thead.append(header); table.append(thead);
-    const body = mk("tbody");
-    for (const row of rows.slice(0, 250)) {
-      const tr = mk("tr"); tr.tabIndex = 0; tr.title = "Открыть " + row.path;
-      for (const col of cols) tr.append(mk("td", "", col === "updatedAt" ? new Date(row.updatedAt).toLocaleDateString("ru-RU") : cellValue(row, col)));
-      tr.addEventListener("click", () => { void config.callbacks.onNoteOpen(row.path); });
-      tr.addEventListener("keydown", e => {
-        if (e.key === "Enter") { e.preventDefault(); void config.callbacks.onNoteOpen(row.path); }
-      });
-      body.append(tr);
+  function columns() {
+    return ["title", "folder", ...config.columns.filter(c => !basesBuiltin.includes(c)), "updatedAt"];
+  }
+  function fillOptions(id, values, empty = null) {
+    const element = $(id), selected = element.value;
+    element.replaceChildren();
+    if (empty !== null) {
+      const opt = mk("option", "", empty);
+      opt.value = ""; element.append(opt);
     }
-    table.append(body); container.append(table);
-    if (rows.length > 250) container.append(mk("p", "knowledge-placeholder", "Показаны первые 250 строк. Уточните фильтр."));
+    for (const value of values) {
+      const option = mk("option", "", value === "title" ? "Заметка" : value === "folder" ? "Папка" : value === "updatedAt" ? "Изменено" : value);
+      option.value = value;
+      element.append(option);
+    }
+    if (values.includes(selected)) element.value = selected;
+  }
+  function formView() {
+    return {
+      layout: $("knowledge-bases-layout").value,
+      sort: $("knowledge-bases-sort").value || "title",
+      direction: $("knowledge-bases-direction").value,
+      group: $("knowledge-bases-group").value,
+      filterField: $("knowledge-bases-property").value || "title",
+      filterValue: $("knowledge-bases-value").value
+    };
+  }
+  function applyView(view) {
+    $("knowledge-bases-layout").value = view.layout;
+    $("knowledge-bases-sort").value = view.sort;
+    $("knowledge-bases-direction").value = view.direction;
+    $("knowledge-bases-group").value = view.group;
+    $("knowledge-bases-property").value = view.filterField;
+    $("knowledge-bases-value").value = view.filterValue;
+    renderBases();
+  }
+  function renderViewSelect() {
+    const select = $("knowledge-bases-views"), current = basesState.currentView;
+    select.replaceChildren();
+    const first=mk("option", "", "Текущий вид");
+    first.value=""; select.append(first);
+    for (const view of basesState.views) {
+      const option=mk("option","",view.name); option.value=view.id; select.append(option);
+    }
+    select.value = basesState.views.some(v=>v.id===current) ? current : "";
+    $("knowledge-bases-delete-view").disabled = !select.value;
+  }
+  async function storeSettings() {
+    const data=await api("/api/knowledge/bases/settings", {
+      settings: { types:basesState.types, views:basesState.views }, expectedSha:basesState.sha
+    });
+    basesState.sha=data.sha;
+    basesState.types=data.types;
+    basesState.views=data.views;
+    renderViewSelect();
+    return data;
+  }
+  async function loadBases() {
+    const target = $("knowledge-bases-table");
+    try {
+      const [data,settings]=await Promise.all([
+        api("/api/knowledge/bases"),api("/api/knowledge/bases/settings")
+      ]);
+      config.rows = data.rows || [];
+      config.columns = [...new Set([...(data.columns || []),...Object.keys(settings.types || {})])];
+      basesState.types = settings.types || {};
+      basesState.views = settings.views || [];
+      basesState.sha = settings.sha;
+      fillOptions("knowledge-bases-property",config.columns);
+      fillOptions("knowledge-bases-sort",config.columns);
+      fillOptions("knowledge-bases-group",config.columns,"Без группировки");
+      renderViewSelect();
+      renderBases();
+    } catch (e) {
+      target.replaceChildren(mk("p","knowledge-placeholder",e.message));
+      basesStatus("Ошибка Bases: "+e.message,true);
+    }
+  }
+  async function createField() {
+    const input=$("knowledge-bases-new-field"), key=input.value.trim();
+    const type=$("knowledge-bases-type").value;
+    if (!/^[a-zA-Zа-яА-ЯёЁ][\wа-яА-ЯёЁ-]{0,39}$/.test(key) || basesReserved.has(key)) {
+      basesStatus("Введите уникальное название поля (буквы, цифры и дефисы).",true); return;
+    }
+    if (config.columns.includes(key)) {
+      basesStatus("Поле уже существует. Для смены типа используйте кнопку заголовка таблицы.",true); return;
+    }
+    if (!basesTypes.includes(type)) return;
+    basesState.types[key]=type;
+    const previousColumns=config.columns.slice();
+    config.columns.push(key);
+    try {
+      await storeSettings();
+      fillOptions("knowledge-bases-property",config.columns);
+      fillOptions("knowledge-bases-sort",config.columns);
+      fillOptions("knowledge-bases-group",config.columns,"Без группировки");
+      input.value="";
+      renderBases();
+      basesStatus("Поле добавлено. Отредактируйте его в строке заметки.");
+    } catch (error) {
+      delete basesState.types[key];
+      config.columns=previousColumns;
+      basesStatus("Не удалось сохранить поле: "+error.message,true);
+      void loadBases();
+    }
+  }
+  async function changeType(key) {
+    if (basesReserved.has(key)) return;
+    const current=basesState.types[key] || "text";
+    const requested=prompt("Тип поля «"+key+"»: text / number / date / checkbox / select / tags",current);
+    if (requested===null) return;
+    const type=requested.trim().toLowerCase();
+    if (!basesTypes.includes(type)) {
+      basesStatus("Допустимые типы: text, number, date, checkbox, select, tags.",true); return;
+    }
+    if (type===current) return;
+    if (!confirm("Сменить тип поля? Уже записанные значения не будут преобразованы автоматически.")) return;
+    basesState.types[key]=type;
+    try { await storeSettings(); renderBases(); basesStatus("Тип поля обновлён: "+key+" → "+type); }
+    catch(e) { basesState.types[key]=current; basesStatus(e.message,true); }
+  }
+  function editorValue(type, raw) {
+    if (type==="checkbox") return raw===true;
+    if (type==="number") {
+      if (raw==="" || !Number.isFinite(Number(raw))) throw new Error("Введите число.");
+      return Number(raw);
+    }
+    if (type==="tags") return raw.split(",").map(x=>x.trim()).filter(Boolean);
+    return raw;
+  }
+  async function writeProperty(row,key,type,value,editor) {
+    if (basesState.busy) return;
+    basesState.busy=true;
+    if (editor) editor.disabled=true;
+    basesStatus("Сохранение свойства…");
+    try {
+      await config.callbacks.beforeRestore();
+      const result=await api("/api/knowledge/bases/property",{
+        path:row.path,key,type,value,expectedSha:row.sha
+      });
+      if (config.active===row.path) await config.callbacks.onReload(row.path);
+      await loadBases();
+      basesStatus(result.unchanged ? "Свойство не изменилось." : "Свойство сохранено в заметке и истории.");
+    } catch(e) {
+      basesStatus("Не удалось сохранить: "+e.message,true);
+      await loadBases();
+    } finally { basesState.busy=false; }
+  }
+  function editableCell(row,key) {
+    const td=mk("td","knowledge-bases-editable");
+    const type=basesState.types[key] || (Array.isArray(row.properties[key])?"tags":"text");
+    const value=cellValue(row,key);
+    const label=mk("button","knowledge-bases-cell-button",value || "＋");
+    label.type="button";
+    label.title="Изменить поле "+key+" · "+type;
+    label.addEventListener("click",()=>{
+      if (basesState.busy) return;
+      td.replaceChildren();
+      const input=mk(type==="select"?"select":"input","knowledge-bases-input");
+      if (type==="select") {
+        const options=[...new Set([value,...config.rows.map(r=>cellValue(r,key))].filter(Boolean))].slice(0,100);
+        const blank=mk("option","","Выберите…");blank.value="";input.append(blank);
+        for (const item of options) {
+          const opt=mk("option","",item);opt.value=item;input.append(opt);
+        }
+        const custom=mk("option","","＋ Другое значение");custom.value="__new_choice__";input.append(custom);
+        input.value=value;
+      } else {
+        input.type=type==="number"?"number":type==="date"?"date":type==="checkbox"?"checkbox":"text";
+        if (type==="number") input.step="any";
+        if (type==="checkbox") input.checked=value.toLowerCase()==="true";
+        else input.value=value;
+        if (type==="tags") input.placeholder="метка1, метка2";
+      }
+      const commit=()=>{
+        try {
+          const v=editorValue(type,type==="checkbox"?input.checked:input.value);
+          void writeProperty(row,key,type,v,input);
+        } catch(e) { basesStatus(e.message,true); renderBases(); }
+      };
+      input.addEventListener("keydown",e=>{
+        if (e.key==="Escape") { e.preventDefault(); renderBases(); }
+        if (e.key==="Enter") { e.preventDefault(); commit(); }
+      });
+      if (type==="checkbox") input.addEventListener("change",commit);
+      if (type==="select") input.addEventListener("change",()=>{
+        if (input.value==="__new_choice__") {
+          const other=prompt("Новое значение поля «"+key+"»:");
+          if (other===null) { renderBases(); return; }
+          void writeProperty(row,key,type,other.trim(),input);
+        } else commit();
+      });
+      const ok=mk("button","knowledge-bases-commit","✓");
+      ok.type="button";ok.title="Сохранить";ok.addEventListener("click",commit);
+      const cancel=mk("button","knowledge-bases-cancel","×");
+      cancel.type="button";cancel.title="Отмена";cancel.addEventListener("click",renderBases);
+      td.append(input,ok,cancel);input.focus();
+    });
+    td.append(label);return td;
+  }
+  function renderBases() {
+    const container=$("knowledge-bases-table");
+    container.replaceChildren();
+    const phrase=$("knowledge-bases-search").value.toLocaleLowerCase("ru").trim();
+    const state=formView();
+    const rows=config.rows.filter(row=>{
+      const matches=(row.path+" "+Object.values(row.properties).join(" ")).toLocaleLowerCase("ru").includes(phrase);
+      const filter=cellValue(row,state.filterField).toLocaleLowerCase("ru").includes(state.filterValue.toLocaleLowerCase("ru"));
+      return matches && filter;
+    }).sort((a,b)=> {
+      const key=state.sort;
+      const type=basesState.types[key] || "text";
+      const x=cellValue(a,key),y=cellValue(b,key);
+      const cmp=type==="number" ? Number(x||0)-Number(y||0) : x.localeCompare(y,"ru",{numeric:true});
+      return (state.direction==="desc"?-1:1)*cmp;
+    });
+    $("knowledge-bases-count").textContent=rows.length+" из "+config.rows.length+
+      " заметок · "+(state.layout==="cards"?"карточки":"таблица")+
+      (state.group?" · группировка "+state.group:"");
+    const groups=new Map();
+    for (const item of rows.slice(0,250)) {
+      const group=state.group ? cellValue(item,state.group) || "Без значения" : "";
+      if (!groups.has(group)) groups.set(group,[]);
+      groups.get(group).push(item);
+    }
+    if (!rows.length) container.append(mk("p","knowledge-placeholder","Нет заметок. Создайте заметку или измените фильтр."));
+    for (const [group,items] of groups) {
+      const section=mk("section","knowledge-bases-group");
+      if (state.group) section.append(mk("h4","knowledge-bases-group-name",group+" · "+items.length));
+      if (state.layout==="cards") {
+        const wrap=mk("div","knowledge-bases-card-grid");
+        for (const row of items) {
+          const card=mk("article","knowledge-bases-card");
+          const open=mk("button","knowledge-bases-card-open",row.title);
+          open.type="button";open.addEventListener("click",()=>{ void config.callbacks.onNoteOpen(row.path); });
+          card.append(open);
+          for (const key of columns().filter(c=>!basesBuiltin.includes(c))) {
+            const line=mk("div","knowledge-bases-card-row");
+            line.append(mk("span","",key),editableCell(row,key));card.append(line);
+          }
+          wrap.append(card);
+        }
+        section.append(wrap);
+      } else {
+        const table=mk("table","knowledge-bases-grid"),head=mk("thead"),hr=mk("tr");
+        for (const key of columns()) {
+          const cell=mk("th");
+          if (basesBuiltin.includes(key)) cell.textContent=key==="title"?"Заметка":key==="folder"?"Папка":"Изменено";
+          else {
+            const button=mk("button","knowledge-bases-field-type",key+" · "+(basesState.types[key]||"text"));
+            button.type="button";button.title="Изменить тип поля";button.addEventListener("click",()=>{void changeType(key);});
+            cell.append(button);
+          }
+          hr.append(cell);
+        }
+        head.append(hr);table.append(head);
+        const body=mk("tbody");
+        for (const row of items) {
+          const tr=mk("tr");
+          for (const key of columns()) {
+            if (key==="title") {
+              const cell=mk("td"),link=mk("button","knowledge-bases-open",row.title);
+              link.type="button";link.title=row.path;
+              link.addEventListener("click",()=>{void config.callbacks.onNoteOpen(row.path);});
+              cell.append(link);tr.append(cell);
+            } else if (key==="folder") tr.append(mk("td","",row.folder));
+            else if (key==="updatedAt") tr.append(mk("td","",new Date(row.updatedAt).toLocaleDateString("ru-RU")));
+            else tr.append(editableCell(row,key));
+          }
+          body.append(tr);
+        }
+        table.append(body);section.append(table);
+      }
+      container.append(section);
+    }
+    if (rows.length>250) container.append(mk("p","knowledge-placeholder","Показаны первые 250 строк. Уточните фильтр."));
+  }
+  async function saveView() {
+    const name=prompt("Имя сохранённого представления:");
+    if (name===null) return;
+    if (!name.trim() || name.length>65) { basesStatus("Имя вида должно содержать 1–65 символов.",true);return; }
+    const id="view-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6);
+    if (basesState.views.length>=30) { basesStatus("Максимум 30 сохранённых видов.",true);return; }
+    const record={id,name:name.trim(),...formView()};
+    basesState.views.push(record);
+    try { await storeSettings();basesState.currentView=id;renderViewSelect();basesStatus("Вид сохранён."); }
+    catch(e) { basesState.views.pop();basesStatus(e.message,true); }
+  }
+  async function deleteView() {
+    const id=$("knowledge-bases-views").value;
+    const item=basesState.views.find(v=>v.id===id);
+    if (!item || !confirm("Удалить сохранённый вид «"+item.name+"»? Данные заметок сохранятся."))return;
+    basesState.views=basesState.views.filter(v=>v.id!==id);
+    try { await storeSettings();basesState.currentView="";renderViewSelect();basesStatus("Представление удалено."); }
+    catch(e) { basesState.views.push(item);basesStatus(e.message,true);void loadBases(); }
   }
   function init(callbacks) {
     if (config.initialized) return;
@@ -332,6 +598,21 @@
     $("knowledge-bases-search").addEventListener("input", renderBases);
     $("knowledge-bases-property").addEventListener("change", renderBases);
     $("knowledge-bases-value").addEventListener("input", renderBases);
+
+    for (const id of ["knowledge-bases-sort","knowledge-bases-direction",
+      "knowledge-bases-group","knowledge-bases-layout"]) {
+      $(id).addEventListener("change", renderBases);
+    }
+    $("knowledge-bases-views").addEventListener("change",event=>{
+      basesState.currentView=event.target.value;
+      const view=basesState.views.find(item=>item.id===basesState.currentView);
+      if (view) applyView(view); else renderBases();
+      renderViewSelect();
+    });
+    $("knowledge-bases-save-view").addEventListener("click",()=>{void saveView();});
+    $("knowledge-bases-delete-view").addEventListener("click",()=>{void deleteView();});
+    $("knowledge-bases-add-field").addEventListener("click",()=>{void createField();});
+
     $("knowledge-history-close").addEventListener("click", () => $("knowledge-history-dialog").close());
     for (const element of document.querySelectorAll("[data-knowledge-mode]")) {
       if (["canvas", "bases"].includes(element.dataset.knowledgeMode))

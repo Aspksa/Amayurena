@@ -10,6 +10,7 @@ const avatarPublisher = require("./avatar-publisher");
 const knowledge = require("./knowledge-core");
 const knowledgeAdvanced = require("./knowledge-advanced-core");
 const knowledgeMaintenance = require("./knowledge-maintenance");
+const knowledgeBases = require("./knowledge-bases-core");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -92,8 +93,9 @@ function createServer(options = {}) {
   const knowledgeRoot = options.knowledgeDirectory || path.join(BASE_DIR, "data", "knowledge");
   const historyRoot = options.knowledgeHistoryDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".history") : path.join(BASE_DIR, "data", "knowledge-history"));
   const canvasRoot = options.knowledgeCanvasDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".canvases") : path.join(BASE_DIR, "data", "canvases"));
+  const basesRoot = options.knowledgeBasesDirectory || (options.knowledgeDirectory ? path.join(path.dirname(knowledgeRoot), ".knowledge-bases") : path.join(BASE_DIR, "data", "knowledge-bases"));
   const maintenanceRoot = options.knowledgeDataDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".workspace") : path.join(BASE_DIR, "data"));
-  const maintenance = { notesRoot: knowledgeRoot, historyRoot, canvasRoot,
+  const maintenance = { notesRoot: knowledgeRoot, historyRoot, canvasRoot, basesRoot,
     trashRoot: path.join(maintenanceRoot, "trash"), backupsRoot: path.join(maintenanceRoot, "backups") };
   let busy = 0;
   let avatarPublishing = false;
@@ -175,6 +177,25 @@ function createServer(options = {}) {
     if (pathname === "/api/knowledge/graph" && req.method === "GET") {
       try { return json(res, 200, knowledge.graph(knowledgeRoot)); }
       catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка построения графа." }); }
+    }
+    if (pathname === "/api/knowledge/bases/settings" && req.method === "GET") {
+      try { return json(res, 200, knowledgeBases.loadSettings(basesRoot)); }
+      catch (e) { return json(res, e.status || 500, {error:e.status ? e.message : "Ошибка настроек Bases."}); }
+    }
+    if (pathname === "/api/knowledge/bases/settings" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res,415,{error:"Ожидался JSON."});
+        const body=await readJson(req);
+        return json(res,200,knowledgeBases.saveSettings(basesRoot,body && body.settings,body && body.expectedSha));
+      } catch (e) { return json(res, e.status || 500, {error:e.status ? e.message : "Настройки Bases не сохранены."}); }
+    }
+    if (pathname === "/api/knowledge/bases/property" && req.method === "POST") {
+      try {
+        if (req.headers["content-type"] !== "application/json") return json(res,415,{error:"Ожидался JSON."});
+        const body=await readJson(req);
+        return json(res,200,knowledgeBases.patchProperty(knowledgeRoot,historyRoot,
+          body && body.path,body && body.key,body && body.type,body && body.value,body && body.expectedSha));
+      } catch (e) { return json(res, e.status || 500, {error:e.status ? e.message : "Свойство заметки не сохранено."}); }
     }
     if (pathname === "/api/knowledge/bases" && req.method === "GET") {
       try { return json(res, 200, knowledgeAdvanced.bases(knowledgeRoot)); }
