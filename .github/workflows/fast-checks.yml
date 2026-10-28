@@ -17,6 +17,7 @@ jobs:
           node --check tests/knowledge-bases.test.cjs
           node --check knowledge-canvas-layout.js
           node --check tests/knowledge-canvas-13.test.cjs
+          node --check tests/knowledge-canvas-navigation.test.cjs
           node --check knowledge-advanced-core.js
           node --check knowledge-advanced.js
           node --check knowledge-markdown.js
