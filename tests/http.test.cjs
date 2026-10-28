@@ -118,3 +118,28 @@ test("installs ten avatar images via local ZIP upload and serves installed WebP"
     });
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test("publishing requires confirmation and configured GitHub token", async () => {
+  await withServer({ env: {} }, async base => {
+    const status = await fetch(base + "/api/avatar/publish/status");
+    assert.equal(status.status, 200);
+    assert.deepEqual(await status.json(), {
+      installed: 0, configured: false, totalBytes: 0, unique: 0, duplicates: []
+    });
+    const wrongOrigin = await fetch(base + "/api/avatar/publish", {
+      method: "POST", headers: { "Content-Type": "application/json", "Origin": "https://evil.test" },
+      body: JSON.stringify({ confirm: "PUBLISH_AVATARS" })
+    });
+    assert.equal(wrongOrigin.status, 403);
+    const badConfirmation = await fetch(base + "/api/avatar/publish", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(badConfirmation.status, 400);
+    const missingToken = await fetch(base + "/api/avatar/publish", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "PUBLISH_AVATARS" })
+    });
+    assert.equal(missingToken.status, 503);
+  });
+});
