@@ -51,7 +51,7 @@ test("history only tracks actual updates and refuses malicious version id", () =
   assert.deepEqual(advanced.saveNote(root, history, "A.md", "x"), { path: "A.md", unchanged: true });
   assert.equal(advanced.history(history, "A.md").length, 0);
   assert.throws(() => advanced.readVersion(history, "A.md", "../../secrets"), { status: 400 });
-  assert.throws(() => advanced.saveNote(root, history, "A.md", "a".repeat(130000)), { status: 413 });
+  assert.throws(() => advanced.saveNote(root, history, "A.md", "a".repeat(128 * 1024 + 1)), { status: 413 });
   assert.equal(notes.read(root, "A.md").content, "x");
 }));
 
