@@ -13,6 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate JavaScript syntax
         run: |
+          node --check knowledge-core.js
+          node --check knowledge.js
+          node --check tests/knowledge.test.cjs
           node --check agents-core.js
           node --check app.js
           node --check workspace.js

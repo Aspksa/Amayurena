@@ -4,7 +4,7 @@
   const core = window.AmayurenaAgents;
   const $ = (id) => document.getElementById(id);
   const dom = {
-    home: $("home-view"), agentsView: $("agents-view"), pageTitle: $("page-title"),
+    home: $("home-view"), agentsView: $("agents-view"), knowledge: $("knowledge-view"), pageTitle: $("page-title"),
     navCount: $("nav-count"), homeCount: $("home-agent-count"),
     grid: $("agent-grid"), empty: $("empty-agents"), emptyTitle: $("empty-title"),
     emptySubtitle: $("empty-subtitle"), emptyCreate: $("empty-create"),
@@ -60,12 +60,14 @@
   }
 
   function navigate(page) {
-    const target = page === "agents" ? "agents" : "home";
+    const target = ["home", "agents", "knowledge"].includes(page) ? page : "home";
     window.AmayurenaWorkspace.closeAgent();
     dom.home.hidden = target !== "home";
     dom.agentsView.hidden = target !== "agents";
-    dom.pageTitle.textContent = target === "agents" ? "Агенты" : "Главная";
-    document.title = (target === "agents" ? "Агенты" : "Главная") + " — Amayurena";
+    dom.knowledge.hidden = target !== "knowledge";
+    if (target === "knowledge") void window.AmayurenaKnowledge.open();
+    dom.pageTitle.textContent = target === "agents" ? "Агенты" : target === "knowledge" ? "Знания" : "Главная";
+    document.title = (target === "agents" ? "Агенты" : target === "knowledge" ? "Знания" : "Главная") + " — Amayurena";
     for (const link of document.querySelectorAll(".nav-link")) {
       const active = link.dataset.page === target;
       link.classList.toggle("active", active);
@@ -75,7 +77,7 @@
   }
 
   function setPage(page) {
-    const hash = page === "agents" ? "#agents" : "#home";
+    const hash = ["home", "agents", "knowledge"].includes(page) ? "#" + page : "#home";
     if (location.hash !== hash) location.hash = hash;
     else navigate(page);
   }
