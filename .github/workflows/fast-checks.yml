@@ -15,6 +15,9 @@ jobs:
         run: |
           node --check agents-core.js
           node --check app.js
+          node --check workspace.js
+          node --check server.js
+          node --check server-core.js
           node --check tests/agents.test.cjs
       - name: Run agent model tests
         run: node --test tests/*.test.cjs
