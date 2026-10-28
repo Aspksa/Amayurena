@@ -157,6 +157,7 @@
     agent = config;
     configured = false;
     busy = false;
+    error("");
     data = loadHistory(config.id);
     d.catalog.hidden = true;
     d.view.hidden = false;
@@ -164,7 +165,6 @@
     d.meta.textContent = (config.role || "Универсальный") + " · Модель: " + (config.model || "endpoint-selected");
     d.chatInput.value = "";
     d.taskInput.value = "";
-    error("");
     renderChat(); renderTasks(); renderTools();
     setConnection("pending", "Проверка подключения…");
     setBusy(false);
@@ -185,7 +185,7 @@
     const current = agent;
     const token = generation;
     const history = mode === "chat"
-      ? data.chat.slice(-16).map(m => ({ role: m.role, content: m.content })) : [];
+      ? data.chat.slice(-16).map(m => ({ role: m.role, content: m.content.slice(0, 12000) })) : [];
     setBusy(true);
     error("");
     setConnection("pending", "Модель отвечает…");
