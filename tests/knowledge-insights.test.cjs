@@ -68,6 +68,15 @@ test("broken and ambiguous references are reported, not silently assigned to unr
   assert.ok(data.missing.some(x=>x.reference==="Повтор"&&x.from==="Main.md"));
   assert.ok(data.missing.some(x=>x.reference==="Несуществующая"));
 }));
+test("notes outside analysis limit are not mislabeled as missing links",()=>fixture(s=>{
+  for(let i=0;i<181;i++)knowledge.create(s.notes,
+    "Тема "+String(i).padStart(3,"0")+".md","# Тема "+i);
+  knowledge.save(s.notes,"Тема 000.md","# Первая тема\n[[Тема 180]]");
+  const data=insights.analyze(s.notes,s.canvas,s.history);
+  assert.equal(data.truncated,true);
+  assert.ok(data.outside.some(e=>e.from==="Тема 000.md"&&e.to==="Тема 180.md"));
+  assert.equal(data.missing.some(e=>e.reference==="Тема 180"),false);
+});
 test("approve suggestion adds one valid wiki-link and saves original note in history",()=>fixture(s=>{
   seed(s);
   const from="Гараж/Двигатель.md",to="Гараж/Ремонт.md";
