@@ -195,8 +195,8 @@
       ui.panel.hidden = false;
       revision = 0; committed = 0;
       renderTree(); renderPreview(); renderBacklinks(); renderGraph();
-      setMode("editor");
       void window.AmayurenaKnowledgeAdvanced.update(notes, active);
+      setMode("editor");
       message("Готово к редактированию");
     } catch (error) { message(error.message, true); }
   }
