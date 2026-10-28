@@ -13,6 +13,7 @@ const knowledgeMaintenance = require("./knowledge-maintenance");
 const knowledgeBases = require("./knowledge-bases-core");
 const knowledgeInsights = require("./knowledge-insights-core");
 const updater = require("./update-worker");
+const attachments = require("./knowledge-attachments");
 const knowledgeMapCatalog = require("./knowledge-map-catalog");
 
 const BASE_DIR = __dirname;
@@ -75,6 +76,24 @@ function readJson(req) {
   });
 }
 
+function readBinary(req,limit=attachments.MAX_BYTES){
+  return new Promise((resolve,reject)=>{
+    let size=0,exceeded=false;
+    const chunks=[];
+    req.on("data",chunk=>{
+      if(exceeded)return;
+      size+=chunk.length;
+      if(size>limit){
+        exceeded=true;
+        reject(Object.assign(new Error("Вложение больше 5 МиБ."),{status:413}));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end",()=>{if(!exceeded)resolve(Buffer.concat(chunks));});
+    req.on("error",reject);
+  });
+}
 function readZip(req) {
   return new Promise((resolve, reject) => {
     let length = 0, exceeded = false;
@@ -105,7 +124,10 @@ function createServer(options = {}) {
   const canvasRoot = options.knowledgeCanvasDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".canvases") : path.join(BASE_DIR, "data", "canvases"));
   const basesRoot = options.knowledgeBasesDirectory || (options.knowledgeDirectory ? path.join(path.dirname(knowledgeRoot), ".knowledge-bases") : path.join(BASE_DIR, "data", "knowledge-bases"));
   const maintenanceRoot = options.knowledgeDataDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".workspace") : path.join(BASE_DIR, "data"));
-  const maintenance = { notesRoot: knowledgeRoot, historyRoot, canvasRoot, basesRoot,
+  const attachmentsRoot = options.knowledgeAttachmentsDirectory ||
+    (options.knowledgeDirectory ? path.join(path.dirname(knowledgeRoot),".knowledge-attachments") :
+      path.join(BASE_DIR,"data","knowledge-attachments"));
+  const maintenance = { notesRoot: knowledgeRoot, historyRoot, canvasRoot, basesRoot, attachmentsRoot,
     trashRoot: path.join(maintenanceRoot, "trash"), backupsRoot: path.join(maintenanceRoot, "backups") };
   let busy = 0;
   let avatarPublishing = false;
@@ -165,6 +187,30 @@ function createServer(options = {}) {
     if (pathname === "/api/knowledge" && req.method === "GET") {
       try { return json(res, 200, knowledge.list(knowledgeRoot)); }
       catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка чтения базы знаний." }); }
+    }
+    if(pathname==="/api/knowledge/attachments"&&req.method==="GET"){
+      try{
+        const q=new URL(req.url,"http://localhost").searchParams;
+        return json(res,200,{items:attachments.list(attachmentsRoot,knowledgeRoot,q.get("path"))});
+      }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Вложения недоступны."});}
+    }
+    if(pathname==="/api/knowledge/attachment"&&req.method==="POST"){
+      try{
+        if(req.headers["content-type"]!=="application/octet-stream")return json(res,415,{error:"Ожидался двоичный файл."});
+        const q=new URL(req.url,"http://localhost").searchParams;
+        const data=await readBinary(req);
+        return json(res,201,attachments.save(attachmentsRoot,knowledgeRoot,q.get("path"),q.get("name"),data));
+      }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Не удалось сохранить вложение."});}
+    }
+    if(pathname==="/api/knowledge/attachment"&&req.method==="GET"){
+      try{
+        const id=new URL(req.url,"http://localhost").searchParams.get("id");
+        const file=attachments.open(attachmentsRoot,id);
+        res.writeHead(200,{"Content-Type":"application/octet-stream",
+          "Content-Disposition":"attachment; filename*=UTF-8''"+encodeURIComponent(file.name),
+          "Content-Length":file.bytes.length,"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
+        return res.end(file.bytes);
+      }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Вложение недоступно."});}
     }
     if (pathname === "/api/knowledge/search" && req.method === "GET") {
       try {
