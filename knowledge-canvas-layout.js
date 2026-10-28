@@ -40,11 +40,8 @@
       const cols=Math.min(12,independent.length);
       const rows=Math.ceil(independent.length/cols);
       let startY=groups.length?y+rowHeight+30:40;
-      if(startY+(rows-1)*165+CARD_H>HEIGHT-30) {
-        // Fall back to the remaining right-hand side when groups have used the bottom.
-        if(x+cols*265>WIDTH-30) throw Error("Для независимых карточек недостаточно места.");
-        startY=40;
-      }
+      if(startY+(rows-1)*165+CARD_H>HEIGHT-30)
+        throw Error("Для независимых карточек недостаточно места на доске.");
       for(let i=0;i<independent.length;i++){
         independent[i].x=40+(i%cols)*265;
         independent[i].y=startY+Math.floor(i/cols)*165;
