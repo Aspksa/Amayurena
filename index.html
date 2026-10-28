@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="./avatar.css">
   <script defer src="./agents-core.js"></script>
   <script defer src="./workspace.js"></script>
+  <script defer src="./knowledge-native.js"></script>
   <script defer src="./knowledge-markdown.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge.js"></script>
@@ -153,7 +154,7 @@
           <div>
             <div class="eyebrow">ЛОКАЛЬНАЯ БАЗА ЗНАНИЙ</div>
             <h2 id="knowledge-heading">Знания</h2>
-            <p>Заметки Markdown, папки и связи между идеями. Файлы хранятся на вашем диске.</p>
+            <p>Создавайте собственные заметки, папки, доски и базы знаний прямо здесь. Начинайте с чистого листа.</p>
           </div>
         </div>
         <div class="knowledge-toolbar">
@@ -171,8 +172,6 @@
             <div class="knowledge-actions">
               <button id="knowledge-create" type="button" class="btn btn-primary">＋ Заметка</button>
               <button id="knowledge-folder" type="button" class="btn btn-soft">＋ Папка</button>
-              <button id="knowledge-import" type="button" class="btn btn-soft">Импорт .md</button>
-              <input id="knowledge-import-files" type="file" accept=".md,text/markdown,text/plain" multiple hidden>
             </div>
             <div id="knowledge-tree" class="knowledge-tree" aria-label="Список заметок"></div>
           </aside>
@@ -236,7 +235,7 @@
             <div id="knowledge-backlinks" class="knowledge-backlinks"></div>
             <h3>История заметки</h3>
             <div id="knowledge-history" class="knowledge-backlinks"></div>
-            <p class="knowledge-tip">Вставьте в текст [[Название заметки]] или [[Папка/Заметка]] для создания связи. Ctrl+S — сохранение.</p>
+            <p class="knowledge-tip">Создавайте записи непосредственно в Amayurena. Связи: [[Название заметки]] и [[Папка/Заметка]]. Ctrl+S — сохранение.</p>
             <div id="knowledge-status" class="knowledge-status" role="status" aria-live="polite"></div>
           </aside>
         </div>
@@ -246,6 +245,59 @@
     </main>
   </div>
 
+
+  <dialog id="knowledge-create-dialog" class="knowledge-create-dialog" aria-labelledby="knowledge-create-heading">
+    <form id="knowledge-create-form" novalidate>
+      <header class="knowledge-create-header">
+        <div class="eyebrow">СОБСТВЕННАЯ БАЗА ЗНАНИЙ</div>
+        <h2 id="knowledge-create-heading">Новая заметка</h2>
+        <p>Создайте запись с нуля или выберите встроенный шаблон Amayurena.</p>
+      </header>
+      <div class="knowledge-create-fields">
+        <label>Название заметки
+          <input id="knowledge-create-name" type="text" maxlength="180" required autocomplete="off" placeholder="Например, Мои идеи">
+        </label>
+        <label>Папка
+          <select id="knowledge-create-folder"><option value="">Корень базы знаний</option></select>
+        </label>
+        <label>Основа записи
+          <select id="knowledge-create-template">
+            <option value="blank">Чистая заметка</option>
+            <option value="idea">Идея</option>
+            <option value="project">Проект</option>
+            <option value="task">Задача</option>
+            <option value="research">Исследование</option>
+          </select>
+        </label>
+      </div>
+      <p id="knowledge-create-preview-label" class="knowledge-create-caption">Предпросмотр содержимого</p>
+      <pre id="knowledge-create-preview" class="knowledge-create-preview" aria-labelledby="knowledge-create-preview-label"></pre>
+      <p id="knowledge-create-error" class="knowledge-create-error" role="alert" hidden></p>
+      <footer class="knowledge-create-actions">
+        <button id="knowledge-create-cancel" class="btn btn-soft" type="button">Отмена</button>
+        <button id="knowledge-create-submit" class="btn btn-primary" type="submit">Создать заметку</button>
+      </footer>
+    </form>
+  </dialog>
+  <dialog id="knowledge-folder-dialog" class="knowledge-create-dialog" aria-labelledby="knowledge-folder-heading">
+    <form id="knowledge-folder-form">
+      <header class="knowledge-create-header">
+        <div class="eyebrow">СТРУКТУРА ЗНАНИЙ</div>
+        <h2 id="knowledge-folder-heading">Новая папка</h2>
+        <p>Можно создать вложенную папку, например Проекты/Исследования.</p>
+      </header>
+      <div class="knowledge-create-fields">
+        <label>Путь папки
+          <input id="knowledge-folder-name" type="text" maxlength="320" required autocomplete="off" placeholder="Проекты/Идеи">
+        </label>
+      </div>
+      <p id="knowledge-folder-error" class="knowledge-create-error" role="alert" hidden></p>
+      <footer class="knowledge-create-actions">
+        <button id="knowledge-folder-cancel" class="btn btn-soft" type="button">Отмена</button>
+        <button id="knowledge-folder-submit" class="btn btn-primary" type="submit">Создать папку</button>
+      </footer>
+    </form>
+  </dialog>
   <dialog id="knowledge-history-dialog" class="knowledge-history-dialog" aria-labelledby="knowledge-history-heading">
     <h2 id="knowledge-history-heading">Предыдущая версия</h2>
     <p class="knowledge-advanced-help">Содержимое доступно только для чтения. Для восстановления используйте кнопку «Вернуть» в истории.</p>

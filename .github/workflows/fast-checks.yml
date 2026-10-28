@@ -18,6 +18,8 @@ jobs:
           node --check knowledge-markdown.js
           node --check tests/knowledge-advanced.test.cjs
           node --check tests/knowledge-markdown.test.cjs
+          node --check knowledge-native.js
+          node --check tests/knowledge-native.test.cjs
           node --check knowledge-core.js
           node --check knowledge.js
           node --check tests/knowledge.test.cjs
