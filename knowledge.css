@@ -38,3 +38,23 @@
 .knowledge-tip { font-size:12px;line-height:1.7;color:#9c9487 }
 @media(max-width:1150px) { .knowledge-layout { grid-template-columns:220px minmax(0,1fr) }.knowledge-inspector { grid-column:1/-1 }.knowledge-graph-panel { grid-column:2 } }
 @media(max-width:740px) { .knowledge-layout { grid-template-columns:1fr }.knowledge-sidebar { position:static;max-height:370px }.knowledge-inspector,.knowledge-graph-panel { grid-column:1 }.knowledge-document { padding:14px } }
+
+
+/* Native content creation: built-in starting points, no file imports. */
+.knowledge-first-start { display:grid;gap:11px;padding:20px 13px;text-align:center;border:1px dashed #ddc9a5;border-radius:13px;background:#fffaf1 }
+.knowledge-first-start strong { font:500 18px Georgia,serif;color:#7b603c }
+.knowledge-first-start p { font-size:12px;line-height:1.6;color:#9d8971;margin:0 }
+.knowledge-first-start .btn { white-space:normal;justify-self:center }
+.knowledge-create-dialog { border:1px solid #e9d9be;border-radius:18px;background:#fffdf9;color:#433a2f;width:min(580px,calc(100vw - 28px));max-height:90vh;overflow:auto;box-shadow:0 24px 80px #342a2040;padding:25px }
+.knowledge-create-dialog::backdrop { background:#231c17a8 }
+.knowledge-create-header h2 { font:500 clamp(24px,3vw,32px) Georgia,serif;margin:9px 0 }
+.knowledge-create-header p { margin:0 0 20px;font-size:13px;line-height:1.6;color:#867869 }
+.knowledge-create-fields { display:grid;gap:15px }
+.knowledge-create-fields label { display:grid;gap:8px;font-size:12px;color:#76654d;font-weight:650 }
+.knowledge-create-fields input,.knowledge-create-fields select { width:100%;padding:12px 13px;border:1px solid #e1d5c4;background:white;border-radius:10px;font:13px 'Segoe UI',sans-serif;color:#423d36 }
+.knowledge-create-fields input:focus-visible,.knowledge-create-fields select:focus-visible { outline:2px solid #bd954e;outline-offset:2px }
+.knowledge-create-caption { margin:21px 0 8px;color:#897451;font-size:12px;font-weight:650 }
+.knowledge-create-preview { font:12px/1.65 ui-monospace,Consolas,monospace;background:#f8f4ed;border:1px solid #e9dfcf;border-radius:10px;max-height:180px;min-height:75px;overflow:auto;padding:13px;white-space:pre-wrap;overflow-wrap:anywhere;color:#65584a }
+.knowledge-create-error { color:#b34339;font-size:12px;line-height:1.55 }
+.knowledge-create-actions { display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end;margin-top:20px }
+@media(max-width:600px) { .knowledge-create-dialog { padding:18px }.knowledge-create-actions .btn { flex:1 } }
