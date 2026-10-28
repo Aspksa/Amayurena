@@ -289,7 +289,10 @@ function restoreBackup(spec, id) {
         throw error;
       }
     }
-    for (const name of VOLUMES) if (fs.existsSync(previous[name])) fs.rmSync(previous[name], { recursive: true, force: true });
+    for (const name of VOLUMES) if (fs.existsSync(previous[name])) {
+      try { fs.rmSync(previous[name], { recursive: true, force: true }); }
+      catch (_) { /* Recovery was installed successfully; preserve old copy on cleanup failure. */ }
+    }
     return { restored: id };
   } catch (error) {
     for (const name of installed.reverse()) {
