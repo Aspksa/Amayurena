@@ -159,3 +159,12 @@
  .knowledge-editor-layout .knowledge-editor,.knowledge-editor-layout .knowledge-preview{height:340px;min-height:180px;max-height:none}
  .knowledge-editor-outline{max-height:230px}
 }
+
+
+/* Local, note-bound attachments */
+.knowledge-attachment-panel{margin:12px 0;border:1px solid #e9ddca;border-radius:12px;padding:12px;background:#fffcf6}
+.knowledge-attachment-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;color:#82603a;font-size:12px}
+.knowledge-attachment-items{display:grid;gap:6px}
+.knowledge-attachment-row{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:10px;background:#fff;border:1px solid #eae2d6;border-radius:8px;padding:8px}
+.knowledge-attachment-row span{flex:1 1 130px;min-width:0;overflow-wrap:anywhere;color:#7f6f59;font-size:12px}
+.knowledge-attachment-status{font-size:11px;line-height:1.5;color:#988269;margin:8px 0 0;overflow-wrap:anywhere}
