@@ -181,9 +181,11 @@ function bases(root) {
   const index = knowledge.list(root);
   const columns = new Set(["title", "folder", "updatedAt"]);
   const rows = index.notes.map(note => {
-    const props = properties(knowledge.read(root, note.path).content);
+    const content = knowledge.read(root, note.path).content;
+    const props = properties(content);
     Object.keys(props).forEach(key => columns.add(key));
-    return { path: note.path, title: note.title, folder: note.folder, updatedAt: note.updatedAt, properties: props };
+    const sha = crypto.createHash("sha256").update(content).digest("hex");
+    return { path: note.path, title: note.title, folder: note.folder, updatedAt: note.updatedAt, sha, properties: props };
   });
   return { columns: [...columns], rows };
 }
