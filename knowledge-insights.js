@@ -135,7 +135,7 @@
         await window.AmayurenaKnowledge.beforeInsightsWrite();
       await fetchJson("/api/knowledge/insights/accept",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({from:s.from,to:s.to,expectedSha:s.sourceSha})
+        body:JSON.stringify({from:s.from,to:s.to,expectedSha:s.sourceSha,targetSha:s.targetSha})
       });
       if(window.AmayurenaKnowledge?.reloadInsightsSource)
         await window.AmayurenaKnowledge.reloadInsightsSource(s.from);
