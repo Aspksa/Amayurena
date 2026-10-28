@@ -67,7 +67,7 @@ function evaluate(expression,fields){
 }
 function aggregate(rows,field){
  validateField(field);
- const values=rows.map(r=>Number(r?.[field])).filter(Number.isFinite);
+ const values=rows.map(r=>r?.[field]).filter(v=>v!==null&&v!==undefined&&v!==""&&typeof v!=="boolean").map(Number).filter(Number.isFinite);
  if(!values.length)return {count:0,sum:0,average:null,min:null,max:null};
  const sum=values.reduce((a,b)=>a+b,0);
  return {count:values.length,sum:Number(sum.toFixed(6)),average:Number((sum/values.length).toFixed(6)),
