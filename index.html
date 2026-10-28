@@ -8,9 +8,11 @@
   <title>Amayurena — Агенты</title>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./workspace.css">
+  <link rel="stylesheet" href="./knowledge.css">
   <link rel="stylesheet" href="./avatar.css">
   <script defer src="./agents-core.js"></script>
   <script defer src="./workspace.js"></script>
+  <script defer src="./knowledge.js"></script>
   <script defer src="./app.js"></script>
   <script defer src="./avatar-assets.js"></script>
   <script defer src="./avatar.js"></script>
@@ -29,6 +31,9 @@
         </button>
         <button class="nav-link" type="button" data-page="agents">
           <span class="nav-icon" aria-hidden="true">✧</span> Агенты <span id="nav-count" class="nav-count">0</span>
+        </button>
+        <button class="nav-link" type="button" data-page="knowledge">
+          <span class="nav-icon" aria-hidden="true">◇</span> Знания
         </button>
       </nav>
       <p class="sidebar-note">Агенты хранятся локально в этом браузере. Создайте резервную копию для переноса.</p>
@@ -139,6 +144,59 @@
           <p id="workspace-error" class="workspace-error" role="alert" hidden></p>
           <p class="workspace-privacy">История диалогов и задач хранится в вашем браузере. Сообщения, отправляемые модели, обрабатываются Cloud.ru. Не передавайте секреты или персональные данные без необходимости.</p>
         </section>
+      </section>
+      <section id="knowledge-view" class="view" aria-labelledby="knowledge-heading" hidden>
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">ЛОКАЛЬНАЯ БАЗА ЗНАНИЙ</div>
+            <h2 id="knowledge-heading">Знания</h2>
+            <p>Заметки Markdown, папки и связи между идеями. Файлы хранятся на вашем диске.</p>
+          </div>
+        </div>
+        <div class="knowledge-toolbar">
+          <span id="knowledge-stats" class="knowledge-summary">Загрузка…</span>
+          <button id="knowledge-mode" data-current="editor" class="btn btn-soft" type="button">Граф</button>
+        </div>
+        <div class="knowledge-layout">
+          <aside class="knowledge-sidebar" aria-label="Файлы базы знаний">
+            <label class="sr-only" for="knowledge-search">Поиск по заметкам</label>
+            <input id="knowledge-search" type="search" maxlength="150" placeholder="Поиск заметок и текста…">
+            <div class="knowledge-actions">
+              <button id="knowledge-create" type="button" class="btn btn-primary">＋ Заметка</button>
+              <button id="knowledge-folder" type="button" class="btn btn-soft">＋ Папка</button>
+              <button id="knowledge-import" type="button" class="btn btn-soft">Импорт .md</button>
+              <input id="knowledge-import-files" type="file" accept=".md,text/markdown,text/plain" multiple hidden>
+            </div>
+            <div id="knowledge-tree" class="knowledge-tree" aria-label="Список заметок"></div>
+          </aside>
+          <section id="knowledge-editor-panel" class="knowledge-document" aria-label="Редактор заметки" hidden>
+            <header class="knowledge-editor-header">
+              <div>
+                <span class="eyebrow">РЕДАКТОР MARKDOWN</span>
+                <strong id="knowledge-path" class="knowledge-path"></strong>
+              </div>
+              <div class="knowledge-editor-controls">
+                <button id="knowledge-save" class="btn btn-soft" type="button">Сохранить</button>
+                <button id="knowledge-delete" class="btn btn-danger" type="button">Удалить</button>
+              </div>
+            </header>
+            <label class="sr-only" for="knowledge-editor">Текст Markdown</label>
+            <textarea id="knowledge-editor" class="knowledge-editor" spellcheck="true" placeholder="Начните писать… Используйте [[Название заметки]] для связи."></textarea>
+            <h3>Предпросмотр</h3>
+            <div id="knowledge-preview" class="knowledge-preview" aria-label="Безопасный предпросмотр Markdown"></div>
+          </section>
+          <section id="knowledge-graph-panel" class="knowledge-graph-panel" hidden aria-label="Карта знаний">
+            <h3>Граф связей</h3>
+            <p class="knowledge-tip">Нажмите на узел, чтобы открыть заметку. На карте показаны первые 80 заметок.</p>
+            <svg id="knowledge-graph" class="knowledge-graph" role="img" aria-label="Граф заметок и ссылок" viewBox="0 0 900 580"></svg>
+          </section>
+          <aside class="knowledge-inspector" aria-label="Связи заметки">
+            <h3>Обратные ссылки</h3>
+            <div id="knowledge-backlinks" class="knowledge-backlinks"></div>
+            <p class="knowledge-tip">Вставьте в текст [[Название заметки]] или [[Папка/Заметка]] для создания связи. Ctrl+S — сохранение.</p>
+            <div id="knowledge-status" class="knowledge-status" role="status" aria-live="polite"></div>
+          </aside>
+        </div>
       </section>
       <p id="storage-warning" class="storage-warning" role="alert" hidden></p>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
