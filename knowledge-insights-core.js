@@ -122,8 +122,11 @@ function accept(notesRoot,historyRoot,canvasRoot,request){
   if(from===to)throw problem("Нельзя связать заметку саму с собой.");
   if(typeof request.expectedSha!=="string"||!/^[a-f0-9]{64}$/.test(request.expectedSha))
     throw problem("Не указана версия исходной заметки.");
+  if(typeof request.targetSha!=="string"||!/^[a-f0-9]{64}$/.test(request.targetSha))
+    throw problem("Не указана версия целевой заметки.");
   const source=knowledge.read(notesRoot,from),target=knowledge.read(notesRoot,to);
   if(sha(source.content)!==request.expectedSha)throw problem("Исходная заметка изменилась. Обновите карту.",409);
+  if(sha(target.content)!==request.targetSha)throw problem("Целевая заметка изменилась. Обновите карту.",409);
   const info=analyze(notesRoot,canvasRoot,historyRoot);
   const found=info.suggestions.find(s=>s.from===from&&s.to===to);
   if(!found||found.sourceSha!==request.expectedSha||found.targetSha!==sha(target.content))
