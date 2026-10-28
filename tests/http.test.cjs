@@ -143,3 +143,14 @@ test("publishing requires confirmation and configured GitHub token", async () =>
     assert.equal(missingToken.status, 503);
   });
 });
+
+test("serves built-in AVIF sprite without requiring ZIP installation", async () => {
+  await withServer({ env: {} }, async base => {
+    const response = await fetch(base + "/assets/avatars/sprite.avif");
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "image/avif");
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.equal(bytes.length, 19154);
+    assert.equal(bytes.toString("ascii", 4, 12), "ftypavif");
+  });
+});

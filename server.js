@@ -18,6 +18,7 @@ const STATIC_FILES = Object.freeze({
   "/avatar.js": ["avatar.js", "text/javascript; charset=utf-8"],
   "/avatar-assets.js": ["avatar-assets.js", "text/javascript; charset=utf-8"],
   "/avatar-default.svg": ["avatar-default.svg", "image/svg+xml"],
+  "/assets/avatars/sprite.avif": [path.join("assets", "avatars", "sprite.avif"), "image/avif"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/agents-core.js": ["agents-core.js", "text/javascript; charset=utf-8"],
   "/workspace.js": ["workspace.js", "text/javascript; charset=utf-8"]
