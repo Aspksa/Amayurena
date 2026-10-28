@@ -12,7 +12,8 @@
     dirty: 0, saved: 0, connecting: "", timer: null, sha: null, zoom: 1, transitioning: false,
     history: null, selected: new Set(), grid: false, dragging: false };
   let historyToken = 0;
-  const basesState = { types: {}, views: [], sha: "", currentView: "", busy: false };
+  const basesState = { types: {}, views: [], formulas: {}, sha: "", currentView: "", busy: false };
+  const basesMath = window.AmayurenaBasesMath;
   const basesTypes = ["text", "number", "date", "checkbox", "select", "tags"];
   const basesBuiltin = ["title", "folder", "updatedAt"];
   const basesReserved = new Set(["title", "folder", "updatedAt"]);
@@ -532,6 +533,10 @@
     field.dataset.error = String(bad);
   }
   function cellValue(row, key) {
+    if(Object.hasOwn(basesState.formulas,key)){
+      try{return String(basesMath.evaluate(basesState.formulas[key],row.properties));}
+      catch(_){return "";}
+    }
     const value = row[key] === undefined ? row.properties[key] : row[key];
     return Array.isArray(value) ? value.join(", ") : String(value ?? "");
   }
@@ -559,7 +564,8 @@
       direction: $("knowledge-bases-direction").value,
       group: $("knowledge-bases-group").value,
       filterField: $("knowledge-bases-property").value || "title",
-      filterValue: $("knowledge-bases-value").value
+      filterValue: $("knowledge-bases-value").value,
+      filterOp: $("knowledge-bases-filter-op").value
     };
   }
   function applyView(view) {
@@ -569,6 +575,7 @@
     $("knowledge-bases-group").value = view.group;
     $("knowledge-bases-property").value = view.filterField;
     $("knowledge-bases-value").value = view.filterValue;
+    $("knowledge-bases-filter-op").value = view.filterOp || "contains";
     renderBases();
   }
   function renderViewSelect() {
@@ -584,11 +591,12 @@
   }
   async function storeSettings() {
     const data=await api("/api/knowledge/bases/settings", {
-      settings: { types:basesState.types, views:basesState.views }, expectedSha:basesState.sha
+      settings: { types:basesState.types, views:basesState.views, formulas:basesState.formulas }, expectedSha:basesState.sha
     });
     basesState.sha=data.sha;
     basesState.types=data.types;
     basesState.views=data.views;
+    basesState.formulas=data.formulas||{};
     renderViewSelect();
     return data;
   }
@@ -599,9 +607,10 @@
         api("/api/knowledge/bases"),api("/api/knowledge/bases/settings")
       ]);
       config.rows = data.rows || [];
-      config.columns = [...new Set([...(data.columns || []),...Object.keys(settings.types || {})])];
+      config.columns = [...new Set([...(data.columns || []),...Object.keys(settings.types || {}),...Object.keys(settings.formulas||{})])];
       basesState.types = settings.types || {};
       basesState.views = settings.views || [];
+      basesState.formulas = settings.formulas || {};
       basesState.sha = settings.sha;
       fillOptions("knowledge-bases-property",config.columns);
       fillOptions("knowledge-bases-sort",config.columns);
@@ -612,6 +621,32 @@
       target.replaceChildren(mk("p","knowledge-placeholder",e.message));
       basesStatus("Ошибка Bases: "+e.message,true);
     }
+  }
+  async function createFormula(){
+    const name=$("knowledge-bases-formula-name").value.trim();
+    const expr=$("knowledge-bases-formula-expression").value.trim();
+    if(!/^[a-zA-Zа-яА-ЯёЁ][\wа-яА-ЯёЁ-]{0,39}$/.test(name)||
+      ["title","folder","updatedAt","__proto__","constructor"].includes(name)||
+      config.columns.includes(name)){basesStatus("Укажите новое уникальное имя для вычисляемого поля.",true);return;}
+    if(!expr){basesStatus("Укажите формулу, например price * quantity.",true);return;}
+    try{
+      basesMath.tokenize(expr);
+      basesState.formulas[name]=expr;
+      const oldColumns=config.columns.slice();
+      config.columns.push(name);
+      try{
+        await storeSettings();
+        fillOptions("knowledge-bases-property",config.columns);
+        fillOptions("knowledge-bases-sort",config.columns);
+        fillOptions("knowledge-bases-group",config.columns,"Без группировки");
+        $("knowledge-bases-formula-name").value="";
+        $("knowledge-bases-formula-expression").value="";
+        renderBases();basesStatus("Вычисляемое поле сохранено. Значения исходных заметок не изменены.");
+      }catch(e){
+        delete basesState.formulas[name];config.columns=oldColumns;
+        basesStatus("Формула не сохранена: "+e.message,true);void loadBases();
+      }
+    }catch(e){basesStatus(e.message,true);}
   }
   async function createField() {
     const input=$("knowledge-bases-new-field"), key=input.value.trim();
@@ -642,6 +677,15 @@
     }
   }
   async function changeType(key) {
+    if (Object.hasOwn(basesState.formulas,key)){
+      const previous=basesState.formulas[key];
+      const expression=prompt("Формула "+key+" (только арифметика и поля):",previous);
+      if(expression===null||expression.trim()===previous)return;
+      basesState.formulas[key]=expression.trim();
+      try{await storeSettings();renderBases();basesStatus("Формула обновлена.");}
+      catch(e){basesState.formulas[key]=previous;basesStatus(e.message,true);}
+      return;
+    }
     if (basesReserved.has(key)) return;
     const current=basesState.types[key] || "text";
     const requested=prompt("Тип поля «"+key+"»: text / number / date / checkbox / select / tags",current);
@@ -685,6 +729,11 @@
   }
   function editableCell(row,key) {
     const td=mk("td","knowledge-bases-editable");
+    if(Object.hasOwn(basesState.formulas,key)){
+      td.append(mk("span","knowledge-bases-computed",cellValue(row,key)||"—"));
+      td.title="Вычисляемая формула: "+basesState.formulas[key];
+      return td;
+    }
     const type=basesState.types[key] || (Array.isArray(row.properties[key])?"tags":"text");
     const value=cellValue(row,key);
     const label=mk("button","knowledge-bases-cell-button",value || "＋");
@@ -742,7 +791,7 @@
     const state=formView();
     const rows=config.rows.filter(row=>{
       const matches=(row.path+" "+Object.values(row.properties).join(" ")).toLocaleLowerCase("ru").includes(phrase);
-      const filter=cellValue(row,state.filterField).toLocaleLowerCase("ru").includes(state.filterValue.toLocaleLowerCase("ru"));
+      const filter=basesMath.match(cellValue(row,state.filterField),state.filterValue,state.filterOp);
       return matches && filter;
     }).sort((a,b)=> {
       const key=state.sort;
@@ -752,19 +801,20 @@
       return (state.direction==="desc"?-1:1)*cmp;
     });
     $("knowledge-bases-count").textContent=rows.length+" из "+config.rows.length+
-      " заметок · "+(state.layout==="cards"?"карточки":"таблица")+
+      " заметок · "+(state.layout==="cards"?"карточки":state.layout==="calendar"?"календарь дат":"таблица")+
       (state.group?" · группировка "+state.group:"");
     const groups=new Map();
     for (const item of rows.slice(0,250)) {
-      const group=state.group ? cellValue(item,state.group) || "Без значения" : "";
+      const grouping=state.layout==="calendar"?(state.group||"due"):state.group;
+      const group=grouping ? cellValue(item,grouping) || "Без даты" : "";
       if (!groups.has(group)) groups.set(group,[]);
       groups.get(group).push(item);
     }
     if (!rows.length) container.append(mk("p","knowledge-placeholder","Нет заметок. Создайте заметку или измените фильтр."));
     for (const [group,items] of groups) {
       const section=mk("section","knowledge-bases-group");
-      if (state.group) section.append(mk("h4","knowledge-bases-group-name",group+" · "+items.length));
-      if (state.layout==="cards") {
+      if (state.group || state.layout==="calendar") section.append(mk("h4","knowledge-bases-group-name",group+" · "+items.length));
+      if (state.layout==="cards" || state.layout==="calendar") {
         const wrap=mk("div","knowledge-bases-card-grid");
         for (const row of items) {
           const card=mk("article","knowledge-bases-card");
@@ -810,6 +860,13 @@
       }
       container.append(section);
     }
+    const numericColumns=columns().filter(key=>basesState.types[key]==="number"||Object.hasOwn(basesState.formulas,key));
+    const summary=numericColumns.map(key=>{
+      const results=basesMath.aggregate(rows.slice(0,250).map(row=>({[key]:cellValue(row,key)})),key);
+      return key+": ∑ "+results.sum+" · среднее "+(results.average??"—");
+    });
+    $("knowledge-bases-aggregate").textContent=summary.length?
+      "Итоги по показанным строкам: "+summary.join(" | "):"Числовых полей для агрегирования нет.";
     if (rows.length>250) container.append(mk("p","knowledge-placeholder","Показаны первые 250 строк. Уточните фильтр."));
   }
   async function saveView() {
@@ -928,6 +985,8 @@
     $("knowledge-bases-save-view").addEventListener("click",()=>{void saveView();});
     $("knowledge-bases-delete-view").addEventListener("click",()=>{void deleteView();});
     $("knowledge-bases-add-field").addEventListener("click",()=>{void createField();});
+    $("knowledge-bases-add-formula").addEventListener("click",()=>{void createFormula();});
+    $("knowledge-bases-filter-op").addEventListener("change",renderBases);
 
     $("knowledge-history-close").addEventListener("click", () => $("knowledge-history-dialog").close());
     for (const element of document.querySelectorAll("[data-knowledge-mode]")) {
