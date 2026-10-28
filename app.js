@@ -126,6 +126,11 @@
     const enabled=current.enabled===false;
     const next=agents.map(a=>a.id===id?{...a,enabled,updatedAt:new Date().toISOString()}:a);
     if(saveCatalog(next)) {
+      try {
+        const store=window.AmayurenaSessions.store(localStorage,id);
+        const book=store.load();
+        store.save(window.AmayurenaSessions.recordEvent(book,enabled?"agent_enabled":"agent_disabled"));
+      }catch(_){showToast("Статус агента изменён, но событие не записано в журнал.");}
       if(!enabled)window.AmayurenaWorkspace.closeAgent();
       showToast(enabled?"Агент включён для ручных запросов.":"Агент остановлен. Фоновые процессы не запускаются.");
     }
