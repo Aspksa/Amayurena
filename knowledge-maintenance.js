@@ -79,7 +79,9 @@ function trashList(spec) {
   safeDir(spec.trashRoot);
   return fs.readdirSync(spec.trashRoot).filter(name => /^[0-9]{13}-[a-f0-9-]{8,50}\.json$/.test(name))
     .sort().reverse().map(name => {
-      const entry = JSON.parse(fs.readFileSync(entryFile(spec.trashRoot, name.slice(0,-5)), "utf8"));
+      const filename = entryFile(spec.trashRoot, name.slice(0,-5));
+      safeFile(filename);
+      const entry = JSON.parse(fs.readFileSync(filename, "utf8"));
       return { id: entry.id, path: entry.path, deletedAt: entry.deletedAt };
     });
 }
@@ -94,7 +96,15 @@ function trashRestore(spec, id) {
   return result;
 }
 function ensureVacant(folder) {
-  if (fs.existsSync(folder)) throw fail("Такое имя уже существует.", 409);
+  try { fs.lstatSync(folder); throw fail("Такое имя уже существует.", 409); }
+  catch (error) { if (error.status === 409 || error.code !== "ENOENT") throw error; }
+}
+function preflightHistory(spec, mapping) {
+  for (const [from, to] of mapping) {
+    const oldDir = path.join(spec.historyRoot, sha(from));
+    const newDir = path.join(spec.historyRoot, sha(to));
+    if (fs.existsSync(oldDir)) ensureVacant(newDir);
+  }
 }
 
 function rebaseHistory(spec, mapping) {
@@ -165,6 +175,7 @@ function renameNote(spec, oldPath, nextPath) {
     if (!fs.existsSync(at)) fs.mkdirSync(at);
     if (!fs.lstatSync(at).isDirectory() || fs.lstatSync(at).isSymbolicLink()) throw fail("Небезопасная папка.");
   }
+  preflightHistory(spec, [[from, to]]);
   fs.renameSync(source, dest);
   rebaseHistory(spec, [[from, to]]);
   return { from, to, ...updateReferences(spec, [[from, to]]) };
@@ -199,6 +210,7 @@ function moveFolder(spec, oldPath, nextPath) {
   const moved = core.list(spec.notesRoot).notes
     .filter(note => note.path.startsWith(from + "/"))
     .map(note => [note.path, to + note.path.slice(from.length)]);
+  preflightHistory(spec, moved);
   fs.renameSync(source, dest);
   rebaseHistory(spec, moved);
   return { from, to, moved: moved.length, ...updateReferences(spec, moved) };
@@ -250,8 +262,8 @@ function verifyBackup(spec, id) {
     if (typeof item.path !== "string" || !VOLUMES.some(v => item.path.startsWith(v + "/")) ||
         item.path.includes("\\") || item.path.split("/").some(s => !s || s === "." || s === "..")) throw fail("Небезопасный путь архива.");
     const filename = path.join(folder, ...item.path.split("/"));
-    const data = fs.readFileSync(filename);
     safeFile(filename);
+    const data = fs.readFileSync(filename);
     total += data.length;
     if (total > MAX_BACKUP_BYTES || data.length !== item.bytes || sha(data) !== item.sha256) throw fail("Не совпала контрольная сумма резервной копии.");
   }
