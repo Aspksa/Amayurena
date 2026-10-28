@@ -19,6 +19,8 @@
   <script defer src="./knowledge-document-outline.js"></script>
   <script defer src="./knowledge-markdown.js"></script>
   <script defer src="./knowledge-canvas-layout.js"></script>
+  <script defer src="./knowledge-canvas-enhance.js"></script>
+  <script defer src="./knowledge-bases-math.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge-insights.js"></script>
   <script defer src="./knowledge.js"></script>
@@ -287,6 +289,14 @@
                 </select>
               </label>
             </div>
+            <div class="knowledge-map-catalog-controls">
+              <label for="knowledge-map-folder">Кластер папки:</label>
+              <select id="knowledge-map-folder"><option value="">Все папки</option></select>
+              <button id="knowledge-map-prev" type="button" class="btn btn-soft">← Назад</button>
+              <span id="knowledge-map-page" role="status">Страница 1</span>
+              <button id="knowledge-map-next" type="button" class="btn btn-soft">Далее →</button>
+              <span id="knowledge-map-count"></span>
+            </div>
             <div class="knowledge-insights-layout">
               <div class="knowledge-insights-graph-wrap">
                 <svg id="knowledge-insights-graph" viewBox="0 0 960 620" role="img" aria-label="Сеть заметок с проверенными и предлагаемыми связями"></svg>
@@ -295,6 +305,7 @@
               <aside class="knowledge-insights-detail" aria-label="Объяснение связей">
                 <h4 id="knowledge-insights-detail-title">Выберите заметку</h4>
                 <div id="knowledge-insights-detail-body"><p>Здесь появятся происхождение связей, связанные доски и предложения.</p></div>
+                <div id="knowledge-map-timeline" class="knowledge-map-timeline" aria-live="polite"></div>
               </aside>
             </div>
             <div class="knowledge-insights-review">
@@ -316,11 +327,22 @@
             <div class="knowledge-advanced-toolbar">
               <label class="sr-only" for="knowledge-canvas-select">Выбор доски</label>
               <select id="knowledge-canvas-select" aria-label="Выберите доску"></select>
+              <label class="sr-only" for="knowledge-canvas-template">Шаблон новой доски</label>
+              <select id="knowledge-canvas-template" title="Шаблон новой доски">
+                <option value="blank">Пустая доска</option>
+                <option value="mind">Карта идей</option>
+                <option value="kanban">Три этапа</option>
+              </select>
               <button id="knowledge-canvas-new" class="btn btn-primary" type="button">＋ Доска</button>
               <button id="knowledge-canvas-text" class="btn btn-soft" type="button">＋ Текст</button>
               <button id="knowledge-canvas-file" class="btn btn-soft" type="button">＋ Заметка</button>
               <button id="knowledge-canvas-group" class="btn btn-soft" type="button">＋ Группа</button>
               <button id="knowledge-canvas-layout" class="btn btn-soft" type="button">Упорядочить</button>
+              <button id="knowledge-canvas-undo" class="btn btn-soft" type="button" title="Отменить изменение" disabled>↶ Отменить</button>
+              <button id="knowledge-canvas-redo" class="btn btn-soft" type="button" title="Повторить изменение" disabled>↷ Повторить</button>
+              <button id="knowledge-canvas-select-all" class="btn btn-soft" type="button">Выделить всё</button>
+              <button id="knowledge-canvas-copy" class="btn btn-soft" type="button">Копировать выбранное</button>
+              <button id="knowledge-canvas-snap" class="btn btn-soft" type="button" aria-pressed="false">Сетка: выкл.</button>
               <button id="knowledge-canvas-save" class="btn btn-soft" type="button">Сохранить</button>
               <button id="knowledge-canvas-delete" class="btn btn-danger" type="button">Удалить доску</button>
             </div>
@@ -367,6 +389,13 @@
               <select id="knowledge-bases-property"></select>
               <label class="sr-only" for="knowledge-bases-value">Фильтр по значению поля</label>
               <input id="knowledge-bases-value" type="search" placeholder="Значение поля…">
+              <label for="knowledge-bases-filter-op">Условие:</label>
+              <select id="knowledge-bases-filter-op">
+                <option value="contains">Содержит</option><option value="eq">Равно</option>
+                <option value="neq">Не равно</option><option value="gt">Больше</option>
+                <option value="gte">Не меньше</option><option value="lt">Меньше</option>
+                <option value="lte">Не больше</option>
+              </select>
               <label for="knowledge-bases-sort">Сортировать:</label>
               <select id="knowledge-bases-sort"></select>
               <label for="knowledge-bases-direction">Порядок:</label>
@@ -374,7 +403,7 @@
               <label for="knowledge-bases-group">Группировка:</label>
               <select id="knowledge-bases-group"><option value="">Без группировки</option></select>
               <label for="knowledge-bases-layout">Вид:</label>
-              <select id="knowledge-bases-layout"><option value="table">Таблица</option><option value="cards">Карточки</option></select>
+              <select id="knowledge-bases-layout"><option value="table">Таблица</option><option value="cards">Карточки</option><option value="calendar">Календарь (список дат)</option></select>
             </div>
             <div class="knowledge-bases-schema">
               <label for="knowledge-bases-new-field">Новое поле:</label>
@@ -386,8 +415,14 @@
                 <option value="select">Выбор</option><option value="tags">Метки</option>
               </select>
               <button id="knowledge-bases-add-field" class="btn btn-soft" type="button">Добавить поле</button>
+              <label for="knowledge-bases-formula-name">Вычисляемое поле:</label>
+              <input id="knowledge-bases-formula-name" maxlength="40" placeholder="total">
+              <label for="knowledge-bases-formula-expression">Формула:</label>
+              <input id="knowledge-bases-formula-expression" maxlength="180" placeholder="price * quantity">
+              <button id="knowledge-bases-add-formula" class="btn btn-soft" type="button">＋ Формула</button>
               <span id="knowledge-bases-message" role="status"></span>
             </div>
+            <div id="knowledge-bases-aggregate" class="knowledge-bases-aggregate" role="status"></div>
             <p id="knowledge-bases-count" class="knowledge-advanced-help"></p>
             <div class="knowledge-bases-wrap" id="knowledge-bases-table"></div>
           </section>

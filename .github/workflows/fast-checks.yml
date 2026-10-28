@@ -15,6 +15,10 @@ jobs:
         run: |
           node --check knowledge-bases-core.js
           node --check tests/knowledge-bases.test.cjs
+          node --check knowledge-canvas-enhance.js
+          node --check knowledge-bases-math.js
+          node --check knowledge-map-catalog.js
+          node --check tests/knowledge-next.test.cjs
           node --check knowledge-canvas-layout.js
           node --check tests/knowledge-canvas-13.test.cjs
           node --check tests/knowledge-canvas-navigation.test.cjs

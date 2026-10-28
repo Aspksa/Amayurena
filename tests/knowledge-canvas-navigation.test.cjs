@@ -5,6 +5,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const vm=require("node:vm");
 const layout=require("../knowledge-canvas-layout");
+const enhance=require("../knowledge-canvas-enhance");
 
 class Element {
   constructor(tag="div") {
@@ -37,6 +38,7 @@ function setup({delay=false}={}) {
   const storage=new Map();
   const window={
     AmayurenaCanvasLayout:layout,
+    AmayurenaCanvasEnhance:enhance,
     addEventListener(){},
     localStorage:{setItem:(key,value)=>storage.set(key,String(value)),getItem:key=>storage.get(key)||null}
   };

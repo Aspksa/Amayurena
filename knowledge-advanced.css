@@ -161,3 +161,18 @@
 @media(max-width:1150px) { .knowledge-insights-panel { grid-column:2 } }
 @media(max-width:850px) { .knowledge-insights-layout,.knowledge-insights-review { grid-template-columns:1fr } }
 @media(max-width:740px) { .knowledge-insights-panel { grid-column:1;padding:13px } }
+
+
+/* Canvas 2.0 / Bases 2.0 / large-map improvements */
+.knowledge-canvas-node.selected{outline:3px solid #b88737;outline-offset:3px;box-shadow:0 0 0 5px #e5c99980}
+.knowledge-canvas-viewport{contain:layout paint}
+.knowledge-canvas-viewport:focus-visible{outline:2px solid #c8984f}
+#knowledge-canvas-snap[aria-pressed=true]{background:#f0dfbd;border-color:#bf9957}
+#knowledge-canvas-template{min-width:150px;padding:9px;border:1px solid #e4d5bb;border-radius:9px;background:white;color:#6d573c}
+.knowledge-bases-computed{display:block;padding:8px;color:#8564a1;background:#f8f4fc;border-radius:7px;cursor:help}
+.knowledge-bases-aggregate{padding:10px 12px;margin:12px 0;border:1px solid #e9ddcb;border-radius:11px;background:#fffbf4;color:#866b49;font-size:12px;overflow-wrap:anywhere}
+.knowledge-map-catalog-controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0;padding:12px;background:#fbf7ee;border:1px solid #e5d8c2;border-radius:12px;color:#796343;font-size:12px}
+.knowledge-map-catalog-controls select{max-width:260px;min-width:140px;padding:9px;border:1px solid #d9c9aa;border-radius:9px;background:white;color:#635138}
+.knowledge-map-timeline{border-top:1px solid #e8dece;margin-top:16px;padding-top:12px}
+.knowledge-map-timeline h5{color:#92734a}
+@media(max-width:740px){.knowledge-map-catalog-controls select{max-width:none;flex:1 1 100%}#knowledge-canvas-template{flex:1 1 100%}}
