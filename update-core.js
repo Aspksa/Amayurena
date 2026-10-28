@@ -38,7 +38,7 @@ function safePath(name){
    throw problem("Недопустимое имя файла в ZIP.");
  if(name.split("/").some(part=>/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)))
    throw problem("Архив содержит зарезервированное имя Windows.");
- const allowedRoot=/^[a-zA-Z0-9_-]+\.(js|css|bat|md|json|svg)$/i.test(name);
+ const allowedRoot=/^[a-zA-Z0-9_-]+\.(js|css|html|bat|md|json|svg)$/i.test(name);
  const allowedAssets=/^assets\/avatars\/[a-zA-Z0-9_-]+\.(webp|avif|svg|png)$/i.test(name);
  if(!allowedRoot&&!allowedAssets)throw problem("Архив содержит недопустимый файл: "+name);
  return name;
