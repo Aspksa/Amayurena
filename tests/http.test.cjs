@@ -2,6 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createServer } = require("../server");
+const http = require("node:http");
 
 async function withServer(options, callback) {
   const server = createServer(options);
@@ -32,8 +33,15 @@ test("blocks cross-origin requests and unsafe host", async () => {
       body: JSON.stringify({ name: "current_time_utc", args: {} })
     });
     assert.equal(request.status, 403);
-    const badHost = await fetch(base + "/api/status", { headers: { Host: "badhost.test" } });
-    assert.equal(badHost.status, 403);
+    const target = new URL(base);
+    const status = await new Promise((resolve, reject) => {
+      const req = http.request({ hostname: "127.0.0.1", port: Number(target.port),
+        path: "/api/status", method: "GET", headers: { Host: "badhost.test" } },
+        res => { res.resume(); res.on("end", () => resolve(res.statusCode)); });
+      req.on("error", reject);
+      req.end();
+    });
+    assert.equal(status, 403);
   });
 });
 
