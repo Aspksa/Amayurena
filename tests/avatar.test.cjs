@@ -72,3 +72,43 @@ test("built-in AVIF sprite contains eight unique poses including all ten selecta
   assert.equal(window.AmayurenaAvatarAssetsApi.spriteUrl, "./assets/avatars/sprite.avif");
   assert.equal(window.AmayurenaAvatarAssets.length, 10);
 });
+
+test("built-in artwork maps all ten poses, including duplicated original poses", async () => {
+  const drawCalls = [];
+  let cell = -1;
+  class MockImage {
+    naturalWidth = 768;
+    naturalHeight = 384;
+    set src(value) {
+      assert.equal(value, "./assets/avatars/sprite.avif");
+      queueMicrotask(() => this.onload());
+    }
+  }
+  const window = {};
+  const context = {
+    window,
+    Image: MockImage,
+    localStorage: { getItem: () => null },
+    document: { createElement: kind => {
+      assert.equal(kind, "canvas");
+      return {
+        getContext: () => ({
+          clearRect() {},
+          drawImage(_atlas, sx, sy) {
+            cell = Math.floor(sy / 192) * 4 + Math.floor(sx / 192);
+            drawCalls.push(cell);
+          }
+        }),
+        toDataURL: () => "data:image/png;base64," + Buffer.from(String(cell)).toString("base64")
+      };
+    } },
+    Buffer
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "avatar-assets.js"), "utf8"), context);
+  const frames = await window.AmayurenaAvatarAssetsApi.loadEmbeddedPoses();
+  assert.equal(frames.length, 10);
+  assert.deepEqual(drawCalls, [0, 1, 2, 3, 4, 0, 4, 5, 6, 7]);
+  assert.equal(frames[0], frames[5]);
+  assert.equal(frames[4], frames[6]);
+  assert.notEqual(frames[0], frames[1]);
+});
