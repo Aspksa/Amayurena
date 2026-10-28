@@ -23,6 +23,7 @@ const STATIC_FILES = Object.freeze({
   "/knowledge-native.js": ["knowledge-native.js", "text/javascript; charset=utf-8"],
   "/knowledge-editor-tools.js": ["knowledge-editor-tools.js", "text/javascript; charset=utf-8"],
   "/knowledge-advanced.js": ["knowledge-advanced.js", "text/javascript; charset=utf-8"],
+  "/knowledge-canvas-layout.js": ["knowledge-canvas-layout.js", "text/javascript; charset=utf-8"],
   "/knowledge-markdown.js": ["knowledge-markdown.js", "text/javascript; charset=utf-8"],
   "/knowledge-advanced.css": ["knowledge-advanced.css", "text/css; charset=utf-8"],
   "/avatar.css": ["avatar.css", "text/css; charset=utf-8"],
@@ -231,7 +232,8 @@ function createServer(options = {}) {
         if (req.method === "DELETE") return json(res, 200, knowledgeAdvanced.deleteCanvas(canvasRoot, q.get("name")));
         if (req.headers["content-type"] !== "application/json") return json(res, 415, { error: "Ожидался JSON." });
         const body = await readJson(req);
-        return json(res, 200, knowledgeAdvanced.saveCanvas(canvasRoot, body && body.name, body && body.board));
+        return json(res, 200, knowledgeAdvanced.saveCanvas(canvasRoot, body && body.name, body && body.board,
+          body && Object.prototype.hasOwnProperty.call(body, "expectedSha") ? body.expectedSha : undefined));
       } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Ошибка Canvas." }); }
     }
     if (pathname === "/api/knowledge/note/create" && req.method === "POST") {
