@@ -350,7 +350,8 @@
       const [data,settings]=await Promise.all([
         api("/api/knowledge/bases"),api("/api/knowledge/bases/settings")
       ]);
-      config.rows = data.rows || []; config.columns = data.columns || [];
+      config.rows = data.rows || [];
+      config.columns = [...new Set([...(data.columns || []),...Object.keys(settings.types || {})])];
       basesState.types = settings.types || {};
       basesState.views = settings.views || [];
       basesState.sha = settings.sha;
