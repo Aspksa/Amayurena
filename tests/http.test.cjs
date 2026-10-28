@@ -111,7 +111,7 @@ test("installs ten avatar images via local ZIP upload and serves installed WebP"
       assert.deepEqual(await response.json(), { installed: 10, directory: "assets/avatars" });
       const image = await fetch(base + "/assets/avatars/pose-01.webp");
       assert.equal(image.status, 200);
-      assert.match(image.headers.get("content-type"), /image\\/webp/);
+      assert.ok(image.headers.get("content-type").includes("image/webp"));
       assert.ok((await image.arrayBuffer()).byteLength > 16);
       const wrong = await fetch(base + "/assets/avatars/pose-11.webp");
       assert.equal(wrong.status, 404);
