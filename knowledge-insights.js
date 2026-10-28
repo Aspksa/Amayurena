@@ -163,6 +163,12 @@
         node("small","","Отличается свойство «"+d.field+"». Требует проверки по исходным заметкам."));
       warn.append(item);
     }
+    for(const link of (data.outside||[]).slice(0,12)){
+      const item=node("div","knowledge-insights-review-row");
+      item.append(node("strong","",link.from),
+        node("small","","Ссылка ведёт на существующую заметку за пределами 180 анализируемых: "+link.to));
+      warn.append(item);
+    }
     for(const missing of data.missing.slice(0,20)){
       const item=node("div","knowledge-insights-review-row");
       item.append(node("strong","",missing.from),
