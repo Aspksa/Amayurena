@@ -248,9 +248,11 @@
     if (!canvas.name || !confirm("Удалить доску Canvas «" + canvas.name + "»?")) return;
     const name = canvas.name;
     try {
+      await canvasSave();
+      if (canvas.dirty > canvas.saved) { canvasStatus("Удаление отменено: изменения не сохранены."); return; }
       clearTimeout(canvas.timer);
-      canvas.board = null; canvas.name = ""; canvas.dirty = 0; canvas.saved = 0;
       await api(query("/api/knowledge/canvas", "name", name), undefined, "DELETE");
+      canvas.board = null; canvas.name = ""; canvas.dirty = 0; canvas.saved = 0;
       await listBoards(); renderCanvas(); canvasStatus("Доска удалена.");
     } catch (e) { canvasStatus(e.message); }
   }
