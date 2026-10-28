@@ -345,6 +345,158 @@
       await refresh(); message("Заметка удалена. История сохранена.");
     } catch (error) { message(error.message, true); }
   }
+
+  function query(path, args) {
+    const params = new URLSearchParams(args);
+    return path + "?" + params.toString();
+  }
+  function scheduleSearch() {
+    clearTimeout(searchTimer);
+    const target = $("knowledge-search-results");
+    const phrase = ui.search.value.trim();
+    if (!phrase) { target.hidden = true; target.replaceChildren(); ++searchGeneration; return; }
+    searchTimer = setTimeout(() => { void runSearch(); }, 230);
+  }
+  async function runSearch() {
+    const target = $("knowledge-search-results");
+    const phrase = ui.search.value.trim();
+    if (!phrase) { target.hidden = true; target.replaceChildren(); return; }
+    const token = ++searchGeneration;
+    target.hidden = false;
+    target.replaceChildren(node("p", "knowledge-placeholder", "Поиск по содержимому…"));
+    try {
+      const result = await request(query("/api/knowledge/search", { q: phrase }));
+      if (token !== searchGeneration || ui.search.value.trim() !== phrase) return;
+      target.replaceChildren(node("p", "knowledge-search-summary",
+        result.results.length + (result.truncated ? "+" : "") + " совпадений"));
+      if (!result.results.length) target.append(node("p", "knowledge-placeholder", "Совпадений нет."));
+      for (const entry of result.results) {
+        const button = node("button", "knowledge-search-item");
+        button.type = "button";
+        button.append(node("strong", "", entry.path), node("small", "", entry.snippet));
+        button.addEventListener("click", () => { ui.search.value = ""; scheduleSearch(); renderTree(); void openNote(entry.path); });
+        target.append(button);
+      }
+    } catch (e) { if (token === searchGeneration) target.replaceChildren(node("p", "knowledge-placeholder", e.message)); }
+  }
+  function moveError(text) {
+    const target = $("knowledge-move-error");
+    target.textContent = text;
+    target.hidden = !text;
+  }
+  async function beforeMutation() {
+    await saveNow();
+    if (active && revision > committed) throw new Error("Текущая заметка не сохранена. Перенос и восстановление отменены.");
+    if (window.AmayurenaKnowledgeAdvanced.savePending) {
+      await window.AmayurenaKnowledgeAdvanced.savePending();
+    }
+  }
+  async function openMove(kind, path) {
+    try { await beforeMutation(); }
+    catch (e) { message(e.message, true); return; }
+    moveSource = { kind, path };
+    $("knowledge-move-source").textContent =
+      (kind === "folder" ? "Папка: " : "Заметка: ") + path;
+    $("knowledge-move-destination").value = path;
+    moveError("");
+    $("knowledge-move-dialog").showModal();
+    $("knowledge-move-destination").focus();
+  }
+  async function submitMove(event) {
+    event.preventDefault();
+    const button = $("knowledge-move-submit");
+    if (!moveSource || button.disabled) return;
+    const { kind, path: from } = moveSource;
+    const to = $("knowledge-move-destination").value.trim();
+    button.disabled = true;
+    moveError("");
+    try {
+      await beforeMutation();
+      const result = await post(kind === "folder" ? "/api/knowledge/folder/move" : "/api/knowledge/note/move",
+        { from, to });
+      const previousActive = active;
+      let newActive = active;
+      if (kind === "note" && active === from) newActive = to;
+      else if (kind === "folder" && active.startsWith(from + "/")) newActive = to + active.slice(from.length);
+      $("knowledge-move-dialog").close();
+      moveSource = null;
+      await refresh();
+      if (previousActive && newActive) await openNote(newActive, true);
+      message("Перемещено без перезаписи: " + (result.moved || 1) + " элементов.");
+    } catch (e) { moveError("Не удалось переместить: " + e.message); }
+    finally { button.disabled = false; }
+  }
+  async function openTrash() {
+    const target = $("knowledge-trash-items");
+    $("knowledge-trash-dialog").showModal();
+    target.replaceChildren(node("p", "knowledge-placeholder", "Загрузка корзины…"));
+    try {
+      const response = await request("/api/knowledge/trash");
+      target.replaceChildren();
+      if (!response.items.length) target.append(node("p", "knowledge-placeholder", "Корзина пуста."));
+      for (const item of response.items) {
+        const row = node("div", "knowledge-maintenance-row");
+        row.append(node("span", "", item.path + " · " + new Date(item.deletedAt).toLocaleString("ru-RU")));
+        const button = node("button", "btn btn-small btn-soft", "Восстановить");
+        button.type = "button";
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            await beforeMutation();
+            await post("/api/knowledge/trash/restore", { id: item.id });
+            await refresh();
+            await openTrashRefresh();
+            message("Заметка восстановлена из корзины.");
+          } catch (e) { message("Ошибка восстановления: " + e.message, true); }
+          finally { button.disabled = false; }
+        });
+        row.append(button); target.append(row);
+      }
+    } catch (e) { target.replaceChildren(node("p", "knowledge-placeholder", e.message)); }
+  }
+  async function openTrashRefresh() {
+    $("knowledge-trash-dialog").close();
+    await openTrash();
+  }
+  async function listBackups() {
+    const target = $("knowledge-backup-items");
+    target.replaceChildren(node("p", "knowledge-placeholder", "Проверка резервных копий…"));
+    try {
+      const response = await request("/api/knowledge/backups");
+      target.replaceChildren();
+      if (!response.items.length) target.append(node("p", "knowledge-placeholder", "Резервных копий пока нет."));
+      for (const item of response.items) {
+        const row = node("div", "knowledge-maintenance-row");
+        row.append(node("span", "", new Date(item.createdAt).toLocaleString("ru-RU") +
+          " · " + item.count + " файлов · " + Math.round(item.bytes / 1024) + " КиБ"));
+        const button = node("button", "btn btn-small btn-soft", "Восстановить всё");
+        button.type = "button";
+        button.addEventListener("click", async () => {
+          if (!confirm("Полностью восстановить заметки, доски, историю и корзину из этой копии? Текущие файлы будут заменены. Перед восстановлением сделайте новую резервную копию.")) return;
+          button.disabled = true;
+          try {
+            await beforeMutation();
+            await post("/api/knowledge/backup/restore", { id: item.id, confirm: "RESTORE_BACKUP" });
+            location.reload();
+          } catch (e) { $("knowledge-backup-status").textContent = "Ошибка: " + e.message; }
+          finally { button.disabled = false; }
+        });
+        row.append(button); target.append(row);
+      }
+    } catch (e) { target.replaceChildren(node("p", "knowledge-placeholder", e.message)); }
+  }
+  async function createBackup() {
+    const button = $("knowledge-create-backup");
+    button.disabled = true;
+    $("knowledge-backup-status").textContent = "Создание локальной копии…";
+    try {
+      await beforeMutation();
+      const data = await post("/api/knowledge/backup/create", { confirm: "CREATE_BACKUP" });
+      $("knowledge-backup-status").textContent = "Копия создана: " + data.count + " файлов.";
+      await listBackups();
+    } catch (e) { $("knowledge-backup-status").textContent = "Ошибка: " + e.message; }
+    finally { button.disabled = false; }
+  }
   function setMode(mode) {
     const isGraph = mode === "graph";
     ui.panel.hidden = isGraph || !active;
@@ -366,7 +518,7 @@
       ui.editor.addEventListener("keydown", e => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void saveNow(); }
       });
-      ui.search.addEventListener("input", renderTree);
+      ui.search.addEventListener("input", () => { renderTree(); scheduleSearch(); });
       ui.create.addEventListener("click", openCreateDialog);
       ui.folder.addEventListener("click", openFolderDialog);
       $("knowledge-create-form").addEventListener("submit", event => { void submitCreate(event); });
@@ -377,6 +529,23 @@
       $("knowledge-folder-form").addEventListener("submit", event => { void submitFolder(event); });
       $("knowledge-folder-cancel").addEventListener("click", () => $("knowledge-folder-dialog").close());
       ui.delete.addEventListener("click", () => { void deleteNote(); });
+      $("knowledge-rename").addEventListener("click", () => { if (active) void openMove("note", active); });
+      $("knowledge-move-form").addEventListener("submit", e => { void submitMove(e); });
+      $("knowledge-move-cancel").addEventListener("click", () => $("knowledge-move-dialog").close());
+      $("knowledge-trash-button").addEventListener("click", () => { void openTrash(); });
+      $("knowledge-trash-close").addEventListener("click", () => $("knowledge-trash-dialog").close());
+      $("knowledge-backups-button").addEventListener("click", () => {
+        $("knowledge-backups-dialog").showModal(); void listBackups();
+      });
+      $("knowledge-backups-close").addEventListener("click", () => $("knowledge-backups-dialog").close());
+      $("knowledge-create-backup").addEventListener("click", () => { void createBackup(); });
+      window.addEventListener("beforeunload", e => {
+        if (active && revision > committed) { e.preventDefault(); e.returnValue = ""; }
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && active && revision > committed) void saveNow();
+      });
+      window.addEventListener("online", () => { if (active && revision > committed) void saveNow(); });
       ui.save.addEventListener("click", () => { void saveNow(); });
       ui.mode.addEventListener("click", () => setMode(ui.mode.dataset.current === "graph" ? "editor" : "graph"));
     }
