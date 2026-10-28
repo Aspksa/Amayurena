@@ -45,8 +45,8 @@ function formatValue(type, value) {
   }
   if (type==="relation") {
     if(typeof value!=="string")throw problem("Ссылка должна быть путём к заметке.");
-    const normalized=vault.normalizePath(value.trim().replace(/^\[\[/,"").replace(/\]\]$/,"")+
-      (/\.md$/i.test(value.trim())?"":".md"));
+    const raw=value.trim().replace(/^\[\[/,"").replace(/\]\]$/,"");
+    const normalized=vault.normalizePath(/\.md$/i.test(raw)?raw:raw+".md");
     return JSON.stringify("[["+normalized.replace(/\.md$/i,"")+"]]");
   }
   if (type==="tags") {
