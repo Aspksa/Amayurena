@@ -7,7 +7,9 @@
   <meta name="description" content="Amayurena — личное пространство управления ИИ-агентами.">
   <title>Amayurena — Агенты</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./workspace.css">
   <script defer src="./agents-core.js"></script>
+  <script defer src="./workspace.js"></script>
   <script defer src="./app.js"></script>
 </head>
 <body>
@@ -27,7 +29,7 @@
         </button>
       </nav>
       <p class="sidebar-note">Агенты хранятся локально в этом браузере. Создайте резервную копию для переноса.</p>
-      <div class="sidebar-bottom">AMAYURENA <span>v0.1.0</span></div>
+      <div class="sidebar-bottom">AMAYURENA <span>v0.2.0</span></div>
     </aside>
 
     <main class="main">
@@ -49,16 +51,17 @@
         </div>
         <div class="overview-grid">
           <div class="panel metric"><span>Всего агентов</span><strong id="home-agent-count">0</strong><small>Сохранено в каталоге</small></div>
-          <div class="panel info"><span class="info-icon" aria-hidden="true">◈</span><div><strong>Каталог агентов</strong><p>Настройте имена, роли и системные инструкции. Запуск ИИ будет добавлен отдельно.</p></div></div>
+          <div class="panel info"><span class="info-icon" aria-hidden="true">◈</span><div><strong>Каталог агентов</strong><p>Настройте имена, роли и системные инструкции. Подключайте модель и запускайте задания в рабочем пространстве агента.</p></div></div>
         </div>
       </section>
 
       <section id="agents-view" class="view" aria-labelledby="agents-heading" hidden>
+        <div id="agent-catalog-panel">
         <div class="section-header">
           <div><div class="eyebrow">УПРАВЛЕНИЕ</div><h2 id="agents-heading">Мои агенты</h2><p>Создавайте персональных агентов и задавайте им задачи, роли и инструкции.</p></div>
           <button id="create-agent" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> Создать агента</button>
         </div>
-        <div class="notice"><span aria-hidden="true">ⓘ</span> Сейчас это каталог конфигураций. Подключение модели, выполнение задач и общение с агентами пока не реализованы.</div>
+        <div class="notice"><span aria-hidden="true">ⓘ</span> Для запуска модели используйте Amayurena.bat и настройте Cloud.ru на локальном сервере. Запросы к модели могут тарифицироваться провайдером.</div>
         <div class="toolbar">
           <label class="search-wrap"><span class="sr-only">Поиск агентов</span><span aria-hidden="true">⌕</span><input id="agent-search" type="search" placeholder="Поиск по имени, роли или описанию…" maxlength="100"></label>
           <span id="result-count" class="result-count">0 агентов</span>
@@ -75,6 +78,64 @@
           <button id="empty-create" class="btn btn-primary" type="button">Создать первого агента</button>
         </div>
         <div id="agent-grid" class="agent-grid" aria-live="polite"></div>
+        </div>
+        <section id="agent-workspace" class="agent-workspace" aria-label="Рабочее пространство агента" hidden>
+          <div class="workspace-top">
+            <div>
+              <button id="workspace-back" class="workspace-back" type="button">← Все агенты</button>
+              <div class="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</div>
+              <h2 id="workspace-name">Агент</h2>
+              <p id="workspace-meta" class="workspace-meta"></p>
+            </div>
+            <span id="workspace-connection" class="connection-indicator" role="status">Проверка подключения…</span>
+          </div>
+          <div class="workspace-layout">
+            <section class="workspace-panel workspace-conversation" aria-label="Диалог с агентом">
+              <div class="workspace-panel-heading"><h3>Диалог</h3><button id="workspace-clear-chat" class="btn btn-small btn-soft" type="button">Очистить</button></div>
+              <div id="workspace-chat-history" class="workspace-history" role="log" aria-live="polite" aria-relevant="additions text"></div>
+              <form id="workspace-chat-form" class="workspace-compose">
+                <label for="workspace-chat-input">Сообщение агенту</label>
+                <textarea id="workspace-chat-input" rows="3" maxlength="12000" placeholder="Введите сообщение…" required></textarea>
+                <button id="workspace-chat-send" class="btn btn-primary" type="submit">Отправить</button>
+              </form>
+            </section>
+            <div class="workspace-right">
+              <section class="workspace-panel" aria-label="Выполнение задачи">
+                <div class="workspace-panel-heading"><h3>Задачи</h3></div>
+                <p class="workspace-help">Один запуск — один ответ модели. Автономных фоновых действий нет.</p>
+                <form id="workspace-task-form" class="workspace-compose">
+                  <label for="workspace-task-input">Поставить задачу</label>
+                  <textarea id="workspace-task-input" rows="4" maxlength="12000" placeholder="Например, составь план изучения документа" required></textarea>
+                  <button id="workspace-task-run" class="btn btn-primary" type="submit">Выполнить задачу</button>
+                </form>
+                <div id="workspace-task-history" class="workspace-task-history" role="log" aria-live="polite"></div>
+              </section>
+              <section class="workspace-panel" aria-label="Инструменты">
+                <div class="workspace-panel-heading"><h3>Инструменты</h3></div>
+                <p class="workspace-help">Агент может пользоваться только включёнными инструментами. Их можно проверить вручную.</p>
+                <p id="workspace-tools-info" class="tool-info"></p>
+                <form id="workspace-tool-form" class="tool-form">
+                  <label for="workspace-tool-select">Инструмент</label>
+                  <select id="workspace-tool-select"></select>
+                  <div id="workspace-text-tool">
+                    <label for="workspace-tool-text">Текст для анализа</label>
+                    <textarea id="workspace-tool-text" rows="3" maxlength="8000"></textarea>
+                  </div>
+                  <div id="workspace-math-tool" hidden>
+                    <label for="workspace-math-a">Первое число</label><input id="workspace-math-a" type="number" step="any">
+                    <label for="workspace-math-operation">Операция</label>
+                    <select id="workspace-math-operation"><option value="add">Сложение</option><option value="subtract">Вычитание</option><option value="multiply">Умножение</option><option value="divide">Деление</option></select>
+                    <label for="workspace-math-b">Второе число</label><input id="workspace-math-b" type="number" step="any">
+                  </div>
+                  <button id="workspace-tool-run" class="btn btn-soft" type="submit">Проверить инструмент</button>
+                </form>
+                <output id="workspace-tool-result" class="tool-output" aria-live="polite"></output>
+              </section>
+            </div>
+          </div>
+          <p id="workspace-error" class="workspace-error" role="alert" hidden></p>
+          <p class="workspace-privacy">История диалогов и задач хранится в вашем браузере. Сообщения, отправляемые модели, обрабатываются Cloud.ru. Не передавайте секреты или персональные данные без необходимости.</p>
+        </section>
       </section>
       <p id="storage-warning" class="storage-warning" role="alert" hidden></p>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -88,8 +149,14 @@
         <label class="field">Имя агента <span>*</span><input id="agent-name" name="name" required maxlength="60" placeholder="Например, Архивариус" autocomplete="off"></label>
         <label class="field">Роль <input id="agent-role" name="role" maxlength="60" placeholder="Например, Аналитик документов"></label>
         <label class="field">Описание <textarea id="agent-description" name="description" rows="3" maxlength="400" placeholder="Чем этот агент будет заниматься"></textarea></label>
+        <label class="field">Модель Cloud.ru <input id="agent-model" name="model" maxlength="120" placeholder="endpoint-selected (по умолчанию)"></label>
+        <fieldset class="tool-permissions"><legend>Разрешённые инструменты</legend>
+          <label><input id="tool-text_statistics" type="checkbox" value="text_statistics"> Статистика текста</label>
+          <label><input id="tool-calculate" type="checkbox" value="calculate"> Калькулятор</label>
+          <label><input id="tool-current_time_utc" type="checkbox" value="current_time_utc"> Текущее время UTC</label>
+        </fieldset>
         <label class="field">Системные инструкции <textarea id="agent-instructions" name="instructions" rows="6" maxlength="6000" placeholder="Задачи, правила поведения и ограничения агента"></textarea></label>
-        <p class="field-hint">Инструкции сохраняются в браузере, но ещё не передаются ИИ-модели. Не добавляйте сюда пароли или API-ключи.</p>
+        <p class="field-hint">Настройки и история хранятся в браузере. API-ключ Cloud.ru задаётся только серверу — не записывайте его в инструкции.</p>
         <p id="form-error" class="form-error" role="alert" hidden></p>
       </div>
       <footer class="dialog-footer"><button id="cancel-dialog" class="btn btn-soft" type="button">Отмена</button><button class="btn btn-primary" type="submit">Сохранить агента</button></footer>
