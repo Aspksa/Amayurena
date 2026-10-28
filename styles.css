@@ -125,3 +125,11 @@ dialog::backdrop { background: #26211ca3; backdrop-filter: blur(4px); }
   .agent-grid { grid-template-columns: minmax(0,1fr); }
 }
 @media(prefers-reduced-motion: reduce) { *,*::before,*::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+
+/* Self-update controls: unobtrusive and explicitly initiated */
+.topbar-update{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap;max-width:460px;margin-left:auto}
+.topbar-update .btn{white-space:normal;font-size:12px;padding:8px 10px}
+#update-status{font-size:10px;color:#8c795d;line-height:1.4;flex:1 1 145px;overflow-wrap:anywhere}
+#update-install[hidden]{display:none!important}
+@media(max-width:750px){.topbar-update{max-width:100%;width:100%;justify-content:flex-start;margin-left:0}}
