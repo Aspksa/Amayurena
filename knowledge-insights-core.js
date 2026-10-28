@@ -17,7 +17,7 @@ function shared(a,b){return [...a].filter(w=>b.has(w)).sort((x,y)=>x.localeCompa
 function resolveLink(link,from,notes,byTitle){
   const norm=link.trim().replace(/\.md$/i,"").toLocaleLowerCase("ru");
   const directory=from.folder?from.folder+"/":"";
-  for(const candidate of [norm+".md",directory+norm+".md"]){
+  for(const candidate of [directory+norm+".md",norm+".md"]){
     const found=notes.find(n=>n.path.toLocaleLowerCase("ru")===candidate);
     if(found)return found;
   }
@@ -36,24 +36,25 @@ function collect(notesRoot,canvasRoot){
       tokens:new Set(words(n.title+" "+n.title+" "+body.slice(0,10000)+" "+tags.join(" ")))};
   });
   const byTitle=new Map();
-  for(const item of items){
+  for(const item of index.notes){
     const name=item.title.toLocaleLowerCase("ru");
     if(!byTitle.has(name))byTitle.set(name,[]);
     byTitle.get(name).push(item);
   }
-  const explicit=[],broken=[],edgeKeys=new Set();
+  const explicit=[],broken=[],outside=[],edgeKeys=new Set();
+  const notePaths=new Set(items.map(n=>n.path));
   for(const item of items)for(const ref of knowledge.references(item.content)){
-    const target=resolveLink(ref,item,items,byTitle);
-    if(target){
+    const target=resolveLink(ref,item,index.notes,byTitle);
+    if(target && notePaths.has(target.path)){
       const key=item.path+"\u0000"+target.path;
       if(!edgeKeys.has(key)){edgeKeys.add(key);explicit.push({from:item.path,to:target.path,kind:"wiki",
         provenance:{source:item.path,reference:"[["+ref+"]]"}});
       }
-    }else broken.push({from:item.path,reference:ref});
+    }else if(target) outside.push({from:item.path,to:target.path});
+    else broken.push({from:item.path,reference:ref});
   }
   let boards=[],canvasEdges=[],canvasReferences=[];
   boards=advanced.listCanvases(canvasRoot);
-  const notePaths=new Set(items.map(n=>n.path));
   for(const b of boards){
     const board=advanced.readCanvas(canvasRoot,b.name);
     const map=new Map(board.nodes.filter(n=>n.type==="file").map(n=>[n.id,n.file]));
@@ -71,7 +72,7 @@ function collect(notesRoot,canvasRoot){
       }
     }
   }
-  return {items,explicit,broken,canvasEdges,canvasReferences,boardCount:boards.length,
+  return {items,explicit,broken,outside,canvasEdges,canvasReferences,boardCount:boards.length,
     totalNotes:index.notes.length,analyzedNotes:items.length,truncated:index.notes.length>items.length};
 }
 function similarity(a,b){
@@ -110,7 +111,7 @@ function analyze(notesRoot,canvasRoot,historyRoot){
     tags:n.tags.slice(0,15),historyCount:advanced.history(historyRoot,n.path).length,
     canvasBoards:[...new Set(data.canvasReferences.filter(v=>v.note===n.path).map(v=>v.board))]}));
   return {nodes,links:[...data.explicit,...data.canvasEdges],suggestions:suggestions.slice(0,MAX_PAIRS),
-    disagreements:disagreements.slice(0,40),missing:data.broken.slice(0,80),
+    disagreements:disagreements.slice(0,40),missing:data.broken.slice(0,80),outside:data.outside.slice(0,30),
     counts:{total:data.totalNotes,analyzed:data.analyzedNotes,explicit:data.explicit.length,
       canvas:data.canvasEdges.length,boards:data.boardCount,proposed:suggestions.length,
       differences:disagreements.length},truncated:data.truncated,
