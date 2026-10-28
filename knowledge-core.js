@@ -141,6 +141,22 @@ function save(root, requested, content) {
   return { path: relative, bytes: Buffer.byteLength(content, "utf8"), links: references(content) };
 }
 
+
+function create(root, requested, content) {
+  const relative = normalizePath(requested);
+  if (typeof content !== "string" || Buffer.byteLength(content, "utf8") > MAX_NOTE_BYTES) {
+    throw problem("Текст должен быть строкой не длиннее 128 КБ.", 413);
+  }
+  const filename = secureTarget(root, relative, true);
+  try {
+    fs.writeFileSync(filename, content, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error.code === "EEXIST") throw problem("Заметка уже существует. Выберите другое название.", 409);
+    throw error;
+  }
+  return { path: relative, bytes: Buffer.byteLength(content, "utf8"), links: references(content), created: true };
+}
+
 function remove(root, requested) {
   const relative = normalizePath(requested);
   const filename = secureTarget(root, relative);
@@ -186,4 +202,4 @@ function graph(root) {
   return { nodes: notes.map(({ path: p, title, folder }) => ({ path: p, title, folder })), edges, missing };
 }
 
-module.exports = { MAX_NOTE_BYTES, normalizePath, references, list, read, save, remove, makeFolder, graph, problem };
+module.exports = { MAX_NOTE_BYTES, normalizePath, references, list, read, save, create, remove, makeFolder, graph, problem };
