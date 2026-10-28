@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const vault = require("./knowledge-core");
 const advanced = require("./knowledge-advanced-core");
 const formulasCore = require("./knowledge-bases-math");
-const TYPES = ["text", "number", "date", "checkbox", "select", "tags"];
+const TYPES = ["text", "number", "date", "checkbox", "select", "tags", "relation"];
 const RESERVED = new Set(["title", "folder", "updatedAt", "__proto__", "prototype", "constructor"]);
 const fieldPattern = /^[a-zA-Zа-яА-ЯёЁ][\wа-яА-ЯёЁ-]{0,39}$/;
 function problem(message,status=400) { return Object.assign(new Error(message),{status}); }
@@ -43,6 +43,12 @@ function formatValue(type, value) {
       throw problem("Дата должна иметь формат ГГГГ-ММ-ДД.");
     return value;
   }
+  if (type==="relation") {
+    if(typeof value!=="string")throw problem("Ссылка должна быть путём к заметке.");
+    const normalized=vault.normalizePath(value.trim().replace(/^\[\[/,"").replace(/\]\]$/,"")+
+      (/\.md$/i.test(value.trim())?"":".md"));
+    return JSON.stringify("[["+normalized.replace(/\.md$/i,"")+"]]");
+  }
   if (type==="tags") {
     if (!Array.isArray(value) || value.length>15 || value.some(x=>
       typeof x!=="string" || !x.trim() || x.length>40 || /[\r\n,\[\]#]/.test(x))) throw problem("Неверный список меток.");
@@ -78,6 +84,11 @@ function patchProperty(noteRoot, historyRoot, notePath, key, type, value, expect
   const current=vault.read(noteRoot,notePath);
   if (digest(current.content)!==expectedSha) throw problem("Заметка изменилась. Обновите таблицу перед записью.",409);
   const formatted=formatValue(type,value);
+  if(type==="relation"){
+    const target=JSON.parse(formatted).slice(2,-2)+".md";
+    vault.read(noteRoot,target);
+    if(target===notePath)throw problem("Нельзя связать запись саму с собой.");
+  }
   const next=frontmatterEdit(current.content,key,formatted);
   const result=advanced.saveNote(noteRoot,historyRoot,notePath,next);
   return {path:result.path,sha:digest(next),key,type,value,unchanged:!!result.unchanged};
