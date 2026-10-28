@@ -773,7 +773,60 @@
     $("knowledge-canvas-delete").addEventListener("click", () => { void deleteBoard(); });
     $("knowledge-canvas-text").addEventListener("click", () => addNode("text"));
     $("knowledge-canvas-file").addEventListener("click", () => addNode("file"));
-    $("knowledge-canvas-save").addEventListener("click", () => { void canvasSave(); });
+    $("knowledge-canvas-save").addEventListener("click", () => {
+      void flushCanvas().catch(e => canvasStatus("Не сохранено: "+e.message));
+    });
+    $("knowledge-canvas-group").addEventListener("click",addGroup);
+    $("knowledge-canvas-layout").addEventListener("click",autoArrange);
+    $("knowledge-canvas-zoom-in").addEventListener("click",()=>setZoom(canvas.zoom*1.2));
+    $("knowledge-canvas-zoom-out").addEventListener("click",()=>setZoom(canvas.zoom/1.2));
+    $("knowledge-canvas-zoom-reset").addEventListener("click",()=>setZoom(1));
+    $("knowledge-canvas-zoom-fit").addEventListener("click",fitBoard);
+    const scroller=viewport();
+    scroller.addEventListener("scroll",renderMinimap,{passive:true});
+    scroller.addEventListener("wheel",e=>{
+      if(!e.ctrlKey)return;
+      e.preventDefault();
+      setZoom(canvas.zoom*(e.deltaY<0?1.1:1/1.1));
+    },{passive:false});
+    scroller.addEventListener("keydown",e=>{
+      if(e.key==="Home"){e.preventDefault();scroller.scrollLeft=0;scroller.scrollTop=0;renderMinimap();}
+      if(e.key==="f"||e.key==="F"){e.preventDefault();fitBoard();}
+      if(e.key==="+"||e.key==="="){e.preventDefault();setZoom(canvas.zoom*1.2);}
+      if(e.key==="-"){e.preventDefault();setZoom(canvas.zoom/1.2);}
+    });
+    scroller.addEventListener("pointerdown",e=>{
+      if(e.button!==1)return;
+      e.preventDefault();
+      const pointer=e.pointerId,startX=e.clientX,startY=e.clientY,
+        left=scroller.scrollLeft,top=scroller.scrollTop;
+      scroller.setPointerCapture(pointer);
+      const move=event=>{
+        if(event.pointerId!==pointer)return;
+        scroller.scrollLeft=left-(event.clientX-startX);
+        scroller.scrollTop=top-(event.clientY-startY);
+        renderMinimap();
+      };
+      const done=event=>{
+        if(event.pointerId!==pointer)return;
+        scroller.removeEventListener("pointermove",move);
+        scroller.removeEventListener("pointerup",done);
+        scroller.removeEventListener("pointercancel",done);
+        if(scroller.hasPointerCapture(pointer))scroller.releasePointerCapture(pointer);
+      };
+      scroller.addEventListener("pointermove",move);
+      scroller.addEventListener("pointerup",done);
+      scroller.addEventListener("pointercancel",done);
+    });
+    $("knowledge-canvas-minimap").addEventListener("click",e=>{
+      const map=e.currentTarget,rect=map.getBoundingClientRect();
+      if(!rect.width||!rect.height)return;
+      const x=layout.clamp((e.clientX-rect.left)/rect.width,0,1)*layout.WIDTH;
+      const y=layout.clamp((e.clientY-rect.top)/rect.height,0,1)*layout.HEIGHT;
+      panTo(x,y);scroller.focus();
+    });
+    window.addEventListener("resize",renderMinimap);
+
     $("knowledge-canvas-select").addEventListener("change", e => {
       const selected = e.target.value; void loadBoard(selected).catch(err => canvasStatus(err.message));
     });
@@ -801,11 +854,6 @@
         element.addEventListener("click", () => show(element.dataset.knowledgeMode));
     }
   }
-  async function savePending() {
-    await canvasSave();
-    if (canvas.board && canvas.dirty > canvas.saved) {
-      throw new Error("Изменения Canvas не сохранены. Операция отменена.");
-    }
-  }
+  async function savePending() { await flushCanvas(); }
   window.AmayurenaKnowledgeAdvanced = { init, show, update, renderHistory, savePending };
 })();
