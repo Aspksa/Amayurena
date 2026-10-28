@@ -211,6 +211,7 @@
   async function openNote(path) {
     if (path === active) return;
     await saveNow();
+    if (active && revision > committed) return;
     try {
       const record = await request("/api/knowledge/note?path=" + encodeURIComponent(path));
       active = record.path;
@@ -219,6 +220,7 @@
       ui.panel.hidden = false;
       revision = 0; committed = 0;
       renderTree(); renderPreview(); renderBacklinks(); renderGraph();
+      setMode("editor");
       message("Готово к редактированию");
     } catch (error) { message(error.message, true); }
   }
@@ -231,6 +233,7 @@
       message("Заметка с таким именем уже существует.", true); return;
     }
     await saveNow();
+    if (active && revision > committed) return;
     try {
       await post("/api/knowledge/note", { path, content: "# " + path.split("/").pop().replace(/\.md$/i, "") + "\n\n" });
       await refresh();
@@ -246,6 +249,7 @@
   async function deleteNote() {
     if (!active || !confirm("Удалить заметку «" + active + "»? Это действие нельзя отменить.")) return;
     await saveNow();
+    if (active && revision > committed) return;
     try {
       await request("/api/knowledge/note?path=" + encodeURIComponent(active), { method: "DELETE" });
       active = ""; ui.editor.value = ""; ui.path.textContent = ""; ui.panel.hidden = true;
@@ -257,6 +261,7 @@
     event.target.value = "";
     if (!files.length) return;
     await saveNow();
+    if (active && revision > committed) return;
     let count = 0;
     for (const file of files) {
       if (!/\.md$/i.test(file.name) || file.size > 128 * 1024) { message("Пропущен неподдерживаемый файл: " + file.name, true); continue; }
