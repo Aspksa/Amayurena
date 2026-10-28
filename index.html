@@ -16,6 +16,7 @@
   <script defer src="./workspace.js"></script>
   <script defer src="./knowledge-native.js"></script>
   <script defer src="./knowledge-editor-tools.js"></script>
+  <script defer src="./knowledge-document-outline.js"></script>
   <script defer src="./knowledge-markdown.js"></script>
   <script defer src="./knowledge-canvas-layout.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
@@ -171,6 +172,12 @@
         </div>
         <div class="knowledge-toolbar">
           <span id="knowledge-stats" class="knowledge-summary">Загрузка…</span>
+          <div class="knowledge-preference-controls">
+            <label for="knowledge-layout-density">Интерфейс</label>
+            <select id="knowledge-layout-density" title="Плотность интерфейса">
+              <option value="comfortable">Удобный</option><option value="compact">Компактный</option>
+            </select>
+          </div>
           <div class="knowledge-editor-controls">
             <button id="knowledge-mode" data-current="editor" data-knowledge-mode="graph" class="btn btn-soft" type="button">Граф</button>
             <button id="knowledge-insights-tab" data-knowledge-mode="insights" class="btn btn-soft" type="button">Живая карта</button>
@@ -233,10 +240,24 @@
               <button type="button" data-format="wikilink" title="Связь с заметкой">[[]]</button>
               <button type="button" data-format="link" title="Ссылка">↗</button>
             </div>
-            <label class="sr-only" for="knowledge-editor">Текст Markdown</label>
-            <textarea id="knowledge-editor" class="knowledge-editor" spellcheck="true" placeholder="Начните писать… Используйте [[Название заметки]] для связи."></textarea>
-            <h3>Предпросмотр</h3>
-            <div id="knowledge-preview" class="knowledge-preview" aria-label="Безопасный предпросмотр Markdown"></div>
+            <div class="knowledge-editor-view-controls" role="group" aria-label="Режим редактора">
+              <button id="knowledge-editor-view-split" type="button" class="btn btn-soft" aria-pressed="false">Две панели</button>
+              <button id="knowledge-editor-sync" type="button" class="btn btn-soft" aria-pressed="true">Связать прокрутку</button>
+              <button id="knowledge-editor-outline-toggle" type="button" class="btn btn-soft" aria-pressed="true">Оглавление</button>
+            </div>
+            <div class="knowledge-editor-layout" id="knowledge-editor-layout">
+              <div class="knowledge-editor-text-pane">
+                <label for="knowledge-editor">Markdown <span id="knowledge-editor-line-count" class="knowledge-editor-meta"></span></label>
+                <textarea id="knowledge-editor" class="knowledge-editor" spellcheck="true" placeholder="Начните писать… Используйте [[Название заметки]] для связи."></textarea>
+              </div>
+              <div class="knowledge-editor-preview-pane">
+                <h3>Предпросмотр</h3>
+                <div id="knowledge-preview" class="knowledge-preview" aria-label="Безопасный предпросмотр Markdown"></div>
+              </div>
+              <aside id="knowledge-editor-outline" class="knowledge-editor-outline" aria-label="Оглавление заметки">
+                <strong>Оглавление</strong><nav id="knowledge-outline-list" aria-label="Переходы по заголовкам"></nav>
+              </aside>
+            </div>
           </section>
           <section id="knowledge-graph-panel" class="knowledge-graph-panel" hidden aria-label="Карта знаний">
             <h3>Граф связей</h3>
