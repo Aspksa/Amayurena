@@ -12,7 +12,15 @@
   };
   let notes = [], folders = [], active = "", revision = 0, committed = 0, saveTimer = null;
   let loadedSha = "", searchTimer = null, searchGeneration = 0, moveSource = null;
-  let queue = Promise.resolve(), graph = { nodes: [], edges: [], missing: [] }, initialized = false;
+  let queue = Promise.resolve(), navigation = Promise.resolve(), graph = { nodes: [], edges: [], missing: [] }, initialized = false;
+  const workspace = window.AmayurenaEditorTools.workspace(window.localStorage);
+  const collapsed = new Set((() => {
+    try { const x = JSON.parse(localStorage.getItem("amayu.editor.collapsed")); return Array.isArray(x) ? x.filter(v => typeof v === "string") : []; }
+    catch (_) { return []; }
+  })());
+  function saveCollapsed() {
+    try { localStorage.setItem("amayu.editor.collapsed", JSON.stringify([...collapsed])); } catch (_) {}
+  }
 
   function node(tag, className, value) {
     const n = document.createElement(tag);
@@ -36,48 +44,179 @@
     return request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   }
   function noteButton(note) {
+    const row = node("div", "knowledge-note-row");
     const b = node("button", "knowledge-note" + (note.path === active ? " selected" : ""));
     b.type = "button";
     b.append(node("span", "knowledge-note-icon", "◇"), node("span", "", note.title));
     b.title = note.path;
     b.addEventListener("click", () => { void openNote(note.path); });
-    return b;
+    const favorite = node("button", "knowledge-note-star" + (workspace.state.favorites.includes(note.path) ? " selected" : ""),
+      workspace.state.favorites.includes(note.path) ? "★" : "☆");
+    favorite.type = "button";
+    favorite.title = "Добавить или убрать из избранного";
+    favorite.setAttribute("aria-label", "Избранное: " + note.title);
+    favorite.setAttribute("aria-pressed", String(workspace.state.favorites.includes(note.path)));
+    favorite.addEventListener("click", () => {
+      workspace.favorite(note.path); renderTree(); renderTabs();
+    });
+    row.append(b, favorite);
+    return row;
+  }
+  function renderShortcuts() {
+    function populate(id, paths, emptyText) {
+      const container = $(id);
+      container.replaceChildren();
+      const map = new Map(notes.map(n => [n.path, n]));
+      for (const path of paths.slice(0, id === "knowledge-recent" ? 8 : 15)) {
+        const item = map.get(path);
+        if (!item) continue;
+        const button = node("button", "knowledge-shortcut" + (active === path ? " selected" : ""),
+          (workspace.state.pinned.includes(path) ? "⌁ " : "◇ ") + item.title);
+        button.type = "button";
+        button.title = path;
+        button.addEventListener("click", () => { void openNote(path); });
+        container.append(button);
+      }
+      if (!container.children.length) container.append(node("p", "knowledge-placeholder", emptyText));
+    }
+    populate("knowledge-favorites", workspace.state.favorites, "Отмечайте важные заметки звёздочкой.");
+    populate("knowledge-recent", workspace.state.recent, "Недавно открытых заметок нет.");
+  }
+  function renderTabs() {
+    const container = $("knowledge-open-tabs");
+    container.replaceChildren();
+    const byPath = new Map(notes.map(n => [n.path, n]));
+    const ordering = [...workspace.state.tabs].sort((a,b) =>
+      Number(workspace.state.pinned.includes(b)) - Number(workspace.state.pinned.includes(a)));
+    for (const path of ordering) {
+      if (!byPath.has(path)) continue;
+      const box = node("div", "knowledge-tab" + (path === active ? " selected" : ""));
+      const label = node("button", "knowledge-tab-open",
+        (workspace.state.pinned.includes(path) ? "⌁ " : "") + byPath.get(path).title);
+      label.type = "button";
+      label.title = path;
+      label.setAttribute("role", "tab");
+      label.setAttribute("aria-selected", String(path === active));
+      label.addEventListener("click", () => { void openNote(path); });
+      const close = node("button", "knowledge-tab-x", "×");
+      close.type = "button";
+      close.title = "Закрыть вкладку";
+      close.setAttribute("aria-label", "Закрыть вкладку " + path);
+      close.addEventListener("click", () => { void closeTab(path); });
+      box.append(label, close); container.append(box);
+    }
+    $("knowledge-tab-close").disabled = !active;
+  }
+  function renderBreadcrumbs() {
+    const bar = $("knowledge-breadcrumbs");
+    bar.replaceChildren();
+    if (!active) return;
+    const parts = active.split("/");
+    let current = "";
+    parts.forEach((part,i) => {
+      if (i) bar.append(node("span", "knowledge-crumb-divider", "›"));
+      current += (i ? "/" : "") + part;
+      if (i < parts.length-1) {
+        const folderPath = current;
+        const button = node("button", "knowledge-crumb", part);
+        button.type = "button"; button.title = "Открыть папку в дереве";
+        button.addEventListener("click", () => {
+          const ancestors = folderPath.split("/");
+          for (let j=0;j<ancestors.length;j++) collapsed.delete(ancestors.slice(0,j+1).join("/"));
+          saveCollapsed(); renderTree();
+          $("knowledge-tree").scrollIntoView({ behavior:"smooth", block:"nearest" });
+        });
+        bar.append(button);
+      } else bar.append(node("strong", "", part));
+    });
+  }
+  function updateActions() {
+    const favorite = workspace.state.favorites.includes(active);
+    const pinned = workspace.state.pinned.includes(active);
+    $("knowledge-favorite").textContent = favorite ? "★ В избранном" : "☆ В избранное";
+    $("knowledge-favorite").setAttribute("aria-pressed", String(favorite));
+    $("knowledge-pin").textContent = pinned ? "⌁ Открепить" : "⌁ Закрепить";
+    $("knowledge-pin").setAttribute("aria-pressed", String(pinned));
+  }
+  async function closeTab(path) {
+    if (path === active) {
+      await saveNow();
+      if (revision > committed) { message("Не удалось закрыть: сначала сохраните заметку.", true); return; }
+    }
+    workspace.close(path);
+    if (path === active) {
+      active = "";
+      ui.path.textContent = "";
+      ui.editor.value = "";
+      loadedSha = "";
+      revision = 0; committed = 0;
+      const next = workspace.state.tabs.at(-1);
+      if (next) await openNote(next);
+      else {
+        ui.panel.hidden = true;
+        void window.AmayurenaKnowledgeAdvanced.update(notes, "");
+      }
+    }
+    renderTabs(); renderTree(); renderShortcuts();
   }
   function renderTree() {
     const query = ui.search.value.trim().toLocaleLowerCase("ru");
     const visible = notes.filter(n => (n.path + "\n" + n.excerpt).toLocaleLowerCase("ru").includes(query));
     ui.tree.replaceChildren();
-    const roots = visible.filter(n => !n.folder);
-    if (roots.length) {
-      const block = node("div", "knowledge-folder-group");
-      block.append(node("div", "knowledge-folder-title", "Корень"));
-      roots.forEach(n => block.append(noteButton(n)));
-      ui.tree.append(block);
-    }
+    const byFolder = new Map();
+    const children = new Map();
     for (const folder of folders) {
-      const matches = visible.filter(n => n.folder === folder);
-      if (!matches.length && query) continue;
-      const block = node("div", "knowledge-folder-group");
-      const folderButton = node("button", "knowledge-folder-title knowledge-folder-action", "▸ " + folder + " · Переместить");
-      folderButton.type = "button";
-      folderButton.title = "Переименовать или переместить папку";
-      folderButton.addEventListener("click", () => { void openMove("folder", folder); });
-      block.append(folderButton);
-      matches.forEach(n => block.append(noteButton(n)));
-      ui.tree.append(block);
+      const parts = folder.split("/");
+      const parent = parts.length === 1 ? "" : parts.slice(0,-1).join("/");
+      if (!children.has(parent)) children.set(parent, []);
+      children.get(parent).push(folder);
     }
+    for (const note of visible) {
+      if (!byFolder.has(note.folder)) byFolder.set(note.folder, []);
+      byFolder.get(note.folder).push(note);
+    }
+    function renderFolder(parent, container, depth) {
+      if (depth > 30) return;
+      for (const folder of children.get(parent) || []) {
+        const hasVisible = !query || visible.some(n => n.path.startsWith(folder + "/")) ||
+          folder.toLocaleLowerCase("ru").includes(query);
+        if (!hasVisible) continue;
+        const group = node("div", "knowledge-folder-group");
+        const head = node("div", "knowledge-folder-head");
+        const expanded = query || !collapsed.has(folder);
+        const toggle = node("button", "knowledge-folder-toggle", (expanded ? "▾ " : "▸ ") + folder.split("/").at(-1));
+        toggle.type = "button";
+        toggle.title = folder;
+        toggle.setAttribute("aria-expanded", String(expanded));
+        const tools = node("button", "knowledge-folder-move", "⋯");
+        tools.type = "button";
+        tools.title = "Переименовать или переместить папку";
+        tools.setAttribute("aria-label", "Переместить папку " + folder);
+        tools.addEventListener("click", () => { void openMove("folder", folder); });
+        head.append(toggle, tools); group.append(head);
+        const contents = node("div", "knowledge-folder-children");
+        contents.hidden = !expanded;
+        toggle.addEventListener("click", () => {
+          if (collapsed.has(folder)) collapsed.delete(folder); else collapsed.add(folder);
+          saveCollapsed(); renderTree();
+        });
+        for (const note of byFolder.get(folder) || []) contents.append(noteButton(note));
+        renderFolder(folder, contents, depth+1);
+        group.append(contents); container.append(group);
+      }
+    }
+    for (const note of byFolder.get("") || []) ui.tree.append(noteButton(note));
+    renderFolder("", ui.tree, 0);
     if (!notes.length) {
       const empty = node("div", "knowledge-first-start");
       empty.append(node("strong", "", "Ваша база знаний пока пуста."),
-        node("p", "", "Начните с собственной заметки. Импорт и дополнительные программы не нужны."));
+        node("p", "", "Создайте первую заметку прямо в Amayurena."));
       const begin = node("button", "btn btn-primary", "＋ Первая заметка");
-      begin.type = "button";
-      begin.addEventListener("click", openCreateDialog);
+      begin.type = "button"; begin.addEventListener("click", openCreateDialog);
       empty.append(begin); ui.tree.append(empty);
-    } else if (!visible.length && query) {
-      ui.tree.append(node("p", "knowledge-placeholder", "Ничего не найдено."));
-    }
+    } else if (!visible.length && query) ui.tree.append(node("p", "knowledge-placeholder", "Совпадений по названию нет. Проверьте результаты полнотекстового поиска."));
     ui.stats.textContent = notes.length + " заметок · " + folders.length + " папок · " + graph.edges.length + " связей";
+    renderShortcuts();
   }
   function resolveLink(from, target) {
     const normalized = target.split("#")[0].split("|")[0].trim().replace(/\.md$/i, "");
