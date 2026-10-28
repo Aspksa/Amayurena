@@ -12,6 +12,7 @@ const knowledgeAdvanced = require("./knowledge-advanced-core");
 const knowledgeMaintenance = require("./knowledge-maintenance");
 const knowledgeBases = require("./knowledge-bases-core");
 const knowledgeInsights = require("./knowledge-insights-core");
+const knowledgeMapCatalog = require("./knowledge-map-catalog");
 
 const BASE_DIR = __dirname;
 const STATIC_FILES = Object.freeze({
@@ -180,6 +181,22 @@ function createServer(options = {}) {
         const body = await readJson(req);
         return json(res, 200, knowledgeMaintenance.moveFolder(maintenance, body && body.from, body && body.to));
       } catch (e) { return json(res, e.status || 500, { error: e.status ? e.message : "Не удалось переместить папку." }); }
+    }
+    if (pathname === "/api/knowledge/map/catalog" && req.method === "GET") {
+      try {
+        const q=new URL(req.url,"http://localhost").searchParams;
+        return json(res,200,knowledgeMapCatalog.view(knowledgeRoot,{
+          folder:q.get("folder")||"",q:q.get("q")||"",
+          page:q.has("page")?Number(q.get("page")):0,
+          size:q.has("size")?Number(q.get("size")):120
+        }));
+      }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Не удалось прочитать каталог."});}
+    }
+    if (pathname === "/api/knowledge/map/timeline" && req.method === "GET") {
+      try {
+        const q=new URL(req.url,"http://localhost").searchParams;
+        return json(res,200,knowledgeMapCatalog.timeline(knowledgeRoot,historyRoot,q.get("path")));
+      }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Не удалось получить историю."});}
     }
     if (pathname === "/api/knowledge/insights" && req.method === "GET") {
       try { return json(res,200,knowledgeInsights.analyze(knowledgeRoot,canvasRoot,historyRoot)); }
