@@ -93,7 +93,7 @@ function createServer(options = {}) {
   const knowledgeRoot = options.knowledgeDirectory || path.join(BASE_DIR, "data", "knowledge");
   const historyRoot = options.knowledgeHistoryDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".history") : path.join(BASE_DIR, "data", "knowledge-history"));
   const canvasRoot = options.knowledgeCanvasDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".canvases") : path.join(BASE_DIR, "data", "canvases"));
-  const basesRoot = options.knowledgeBasesDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".bases") : path.join(BASE_DIR, "data", "knowledge-bases"));
+  const basesRoot = options.knowledgeBasesDirectory || (options.knowledgeDirectory ? path.join(path.dirname(knowledgeRoot), ".knowledge-bases") : path.join(BASE_DIR, "data", "knowledge-bases"));
   const maintenanceRoot = options.knowledgeDataDirectory || (options.knowledgeDirectory ? path.join(knowledgeRoot, ".workspace") : path.join(BASE_DIR, "data"));
   const maintenance = { notesRoot: knowledgeRoot, historyRoot, canvasRoot, basesRoot,
     trashRoot: path.join(maintenanceRoot, "trash"), backupsRoot: path.join(maintenanceRoot, "backups") };
