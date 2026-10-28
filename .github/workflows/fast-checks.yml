@@ -34,6 +34,8 @@ jobs:
           node --check tests/knowledge-editor-navigation.test.cjs
           node --check knowledge-native.js
           node --check tests/knowledge-native.test.cjs
+          node --check knowledge-attachments.js
+          node --check tests/knowledge-attachments.test.cjs
           node --check knowledge-maintenance.js
           node --check tests/knowledge-maintenance.test.cjs
           node --check knowledge-insights-core.js
