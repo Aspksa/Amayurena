@@ -9,3 +9,6 @@ coverage/
 
 # Local knowledge vault (private Markdown files)
 data/
+
+# Local update backups, logs, PID and recovery journal
+.updates/
