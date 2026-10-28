@@ -18,6 +18,7 @@
   <script defer src="./knowledge-markdown.js"></script>
   <script defer src="./knowledge-canvas-layout.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
+  <script defer src="./knowledge-insights.js"></script>
   <script defer src="./knowledge.js"></script>
   <script defer src="./app.js"></script>
   <script defer src="./avatar-assets.js"></script>
@@ -163,6 +164,7 @@
           <span id="knowledge-stats" class="knowledge-summary">Загрузка…</span>
           <div class="knowledge-editor-controls">
             <button id="knowledge-mode" data-current="editor" data-knowledge-mode="graph" class="btn btn-soft" type="button">Граф</button>
+            <button id="knowledge-insights-tab" data-knowledge-mode="insights" class="btn btn-soft" type="button">Живая карта</button>
             <button id="knowledge-canvas-tab" data-knowledge-mode="canvas" class="btn btn-soft" type="button">Canvas</button>
             <button id="knowledge-bases-tab" data-knowledge-mode="bases" class="btn btn-soft" type="button">Bases</button>
             <button id="knowledge-backups-button" class="btn btn-soft" type="button">Резервные копии</button>
@@ -231,6 +233,52 @@
             <h3>Граф связей</h3>
             <p class="knowledge-tip">Нажмите на узел, чтобы открыть заметку. На карте показаны первые 80 заметок.</p>
             <svg id="knowledge-graph" class="knowledge-graph" role="img" aria-label="Граф заметок и ссылок" viewBox="0 0 900 580"></svg>
+          </section>
+          <section id="knowledge-insights-panel" class="knowledge-insights-panel" aria-label="Живая карта знаний" hidden>
+            <div class="knowledge-insights-header">
+              <div>
+                <h3>Живая карта знаний</h3>
+                <p>Проверяемые связи между заметками, свойствами Bases и досками Canvas. Похожие темы — только предложения, а не установленные факты.</p>
+              </div>
+              <button id="knowledge-insights-refresh" class="btn btn-soft" type="button">Обновить анализ</button>
+            </div>
+            <p id="knowledge-insights-status" role="status" aria-live="polite">Откройте карту для локального анализа заметок.</p>
+            <div class="knowledge-insights-stats" id="knowledge-insights-stats"></div>
+            <div class="knowledge-insights-controls">
+              <label for="knowledge-insights-search">Найти тему
+                <input id="knowledge-insights-search" type="search" placeholder="Название заметки или метка…" maxlength="120">
+              </label>
+              <label for="knowledge-insights-filter">Показывать связи
+                <select id="knowledge-insights-filter">
+                  <option value="all">Все типы</option>
+                  <option value="wiki">Заметки Markdown</option>
+                  <option value="canvas">Доски Canvas</option>
+                  <option value="suggested">Предложения</option>
+                </select>
+              </label>
+            </div>
+            <div class="knowledge-insights-layout">
+              <div class="knowledge-insights-graph-wrap">
+                <svg id="knowledge-insights-graph" viewBox="0 0 960 620" role="img" aria-label="Сеть заметок с проверенными и предлагаемыми связями"></svg>
+                <p class="knowledge-insights-legend">Сплошная линия — ссылка Markdown или Canvas; пунктир — неподтверждённое сходство. Нажмите на узел для просмотра источников.</p>
+              </div>
+              <aside class="knowledge-insights-detail" aria-label="Объяснение связей">
+                <h4 id="knowledge-insights-detail-title">Выберите заметку</h4>
+                <div id="knowledge-insights-detail-body"><p>Здесь появятся происхождение связей, связанные доски и предложения.</p></div>
+              </aside>
+            </div>
+            <div class="knowledge-insights-review">
+              <section>
+                <h4>Предложенные связи</h4>
+                <p>Подтверждение добавит обычную wiki-ссылку в исходную заметку и сохранит предыдущую версию в истории.</p>
+                <div id="knowledge-insights-suggestions"></div>
+              </section>
+              <section>
+                <h4>Нужно проверить</h4>
+                <p>Различия свойств и отсутствующие ссылки — поводы для проверки, а не доказанные ошибки.</p>
+                <div id="knowledge-insights-warnings"></div>
+              </section>
+            </div>
           </section>
           <section id="knowledge-canvas-panel" class="knowledge-canvas-panel" hidden aria-label="Интерактивная доска Canvas">
             <h3>Canvas — доска идей</h3>
