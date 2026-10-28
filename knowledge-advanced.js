@@ -75,6 +75,7 @@
     $("knowledge-graph-panel").hidden = mode !== "graph";
     $("knowledge-canvas-panel").hidden = mode !== "canvas";
     $("knowledge-bases-panel").hidden = mode !== "bases";
+    $("knowledge-inspector").hidden = mode === "canvas" || mode === "bases";
     for (const item of document.querySelectorAll("[data-knowledge-mode]")) {
       item.classList.toggle("knowledge-active-tab", item.dataset.knowledgeMode === mode);
     }
