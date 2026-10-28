@@ -165,8 +165,14 @@ function properties(content) {
   for (const line of lines.slice(1, end + 1)) {
     const match = /^([a-zA-Zа-яА-ЯёЁ][\wа-яА-ЯёЁ-]{0,39}):\s*(.{0,250})$/.exec(line);
     if (!match || ["constructor", "prototype", "__proto__"].includes(match[1])) continue;
-    let value = match[2].replace(/^["']|["']$/g, "");
-    if (/^\[[^\[\]]*\]$/.test(value)) value = value.slice(1, -1).split(",").map(x => x.trim()).filter(Boolean);
+    let value = match[2];
+    if (value.startsWith('"') && value.endsWith('"')) {
+      try { value = JSON.parse(value); }
+      catch (_) { value = value.slice(1,-1); }
+    } else value = value.replace(/^'|'$/g, "");
+    if (typeof value === "string" && /^\[[^\[\]]*\]$/.test(value)) {
+      value = value.slice(1, -1).split(",").map(x => x.trim()).filter(Boolean);
+    }
     result[match[1]] = value;
   }
   return result;
