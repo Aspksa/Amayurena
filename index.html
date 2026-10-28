@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="./knowledge-advanced.css">
   <link rel="stylesheet" href="./avatar.css">
   <script defer src="./agents-core.js"></script>
+  <script defer src="./chat-sessions.js"></script>
   <script defer src="./workspace.js"></script>
   <script defer src="./knowledge-native.js"></script>
   <script defer src="./knowledge-editor-tools.js"></script>
@@ -106,12 +107,18 @@
           </div>
           <div class="workspace-layout">
             <section class="workspace-panel workspace-conversation" aria-label="Диалог с агентом">
-              <div class="workspace-panel-heading"><h3>Диалог</h3><button id="workspace-clear-chat" class="btn btn-small btn-soft" type="button">Очистить</button></div>
+              <div class="workspace-panel-heading"><h3>Диалог</h3><button id="workspace-new-chat" class="btn btn-small btn-primary" type="button">＋ Диалог</button><button id="workspace-delete-chat" class="btn btn-small btn-soft" type="button">Удалить диалог</button></div>
+              <div class="workspace-dialog-controls">
+                <label for="workspace-chat-select">Диалоги:</label><select id="workspace-chat-select" aria-label="Выбор диалога"></select>
+                <label for="workspace-chat-search">Найти в сообщениях:</label><input id="workspace-chat-search" type="search" placeholder="Поиск по текущему диалогу…" maxlength="100">
+                <button id="workspace-rename-chat" type="button" class="btn btn-small btn-soft">Переименовать</button>
+              </div>
               <div id="workspace-chat-history" class="workspace-history" role="log" aria-live="polite" aria-relevant="additions text"></div>
               <form id="workspace-chat-form" class="workspace-compose">
                 <label for="workspace-chat-input">Сообщение агенту</label>
                 <textarea id="workspace-chat-input" rows="3" maxlength="12000" placeholder="Введите сообщение…" required></textarea>
                 <button id="workspace-chat-send" class="btn btn-primary" type="submit">Отправить</button>
+                <button id="workspace-chat-cancel" class="btn btn-soft" type="button" hidden>Отменить ожидание</button>
               </form>
             </section>
             <div class="workspace-right">
@@ -124,6 +131,8 @@
                   <button id="workspace-task-run" class="btn btn-primary" type="submit">Выполнить задачу</button>
                 </form>
                 <div id="workspace-task-history" class="workspace-task-history" role="log" aria-live="polite"></div>
+                <p id="workspace-usage" class="workspace-help">Стоимость запросов зависит от модели и тарифа Cloud.ru; без данных провайдера сумма не рассчитывается.</p>
+                <div id="workspace-diagnostics" class="workspace-help" role="status"></div>
               </section>
               <section class="workspace-panel" aria-label="Инструменты">
                 <div class="workspace-panel-heading"><h3>Инструменты</h3></div>
@@ -478,6 +487,7 @@
           <label><input id="tool-calculate" type="checkbox" value="calculate"> Калькулятор</label>
           <label><input id="tool-current_time_utc" type="checkbox" value="current_time_utc"> Текущее время UTC</label>
         </fieldset>
+        <label class="field"><input id="agent-enabled" type="checkbox" checked> Агент включён (разрешён ручной запуск)</label>
         <label class="field">Системные инструкции <textarea id="agent-instructions" name="instructions" rows="6" maxlength="6000" placeholder="Задачи, правила поведения и ограничения агента"></textarea></label>
         <p class="field-hint">Настройки и история хранятся в браузере. API-ключ Cloud.ru задаётся только серверу — не записывайте его в инструкции.</p>
         <p id="form-error" class="form-error" role="alert" hidden></p>
