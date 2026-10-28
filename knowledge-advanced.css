@@ -38,3 +38,46 @@
 .knowledge-preview a { color:#8f6b2c }
 @media(max-width:1150px) { .knowledge-canvas-panel,.knowledge-bases-panel { grid-column:2 } }
 @media(max-width:740px) { .knowledge-canvas-panel,.knowledge-bases-panel { grid-column:1 }.knowledge-canvas-viewport { height:520px }.knowledge-history-dialog {padding:14px} }
+
+
+/* Package 12 — editable Bases, custom views and grouping */
+.knowledge-bases-panel [hidden] { display:none !important }
+.knowledge-bases-view-controls,.knowledge-bases-schema { display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:12px 0 }
+.knowledge-bases-view-controls { border-bottom:1px solid #eadfce }
+.knowledge-bases-view-controls label,.knowledge-bases-schema label { font-size:12px;font-weight:650;color:#9b7a4a }
+.knowledge-bases-view-controls select,.knowledge-bases-schema select,.knowledge-bases-schema input {
+ border:1px solid #e3d5bc;border-radius:9px;background:#fffdfa;color:#665137;min-width:105px;
+ padding:10px;font-size:12px;max-width:100%
+}
+.knowledge-bases-schema { padding:13px;background:#fdfaf4;border:1px solid #ece3d4;border-radius:12px;margin:10px 0 }
+.knowledge-bases-schema input { flex:1 1 125px }
+#knowledge-bases-message { flex:1 1 200px;font-size:12px;color:#947d55;overflow-wrap:anywhere }
+#knowledge-bases-message[data-error=true] { color:#ae443f }
+.knowledge-bases-group { margin:15px 0 18px;min-width:0 }
+.knowledge-bases-group-name { font:500 18px Georgia,serif;color:#926a37;margin:11px 0 }
+.knowledge-bases-field-type { display:block;white-space:nowrap;background:transparent;border:0;text-align:left;
+ color:inherit;font:inherit;padding:4px;border-radius:6px;cursor:pointer }
+.knowledge-bases-field-type:hover { background:#f5e9d4 }
+.knowledge-bases-editable { min-width:110px;max-width:230px;vertical-align:middle }
+.knowledge-bases-cell-button,.knowledge-bases-open { display:block;width:100%;min-width:80px;text-align:left;
+ border:1px solid transparent;background:transparent;color:#63543f;cursor:pointer;border-radius:7px;
+ padding:7px 6px;white-space:normal;overflow-wrap:anywhere;font-size:12px }
+.knowledge-bases-cell-button:hover { background:#fff3df;border-color:#ead5b5 }
+.knowledge-bases-open { color:#9b722e;text-decoration:underline;text-underline-offset:3px }
+.knowledge-bases-input { max-width:120px;min-width:60px;padding:7px;border:1px solid #d9bd8a;border-radius:6px;background:#fff;
+ color:#5f5547;font-size:12px }
+.knowledge-bases-commit,.knowledge-bases-cancel { border:0;background:#f5ead7;color:#826038;border-radius:5px;
+ cursor:pointer;margin-left:3px;padding:5px 8px }
+.knowledge-bases-card-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px }
+.knowledge-bases-card { border:1px solid #e9dcc8;background:#fffdfa;border-radius:14px;padding:14px;
+ box-shadow:0 2px 8px #8e6b3220;min-width:0 }
+.knowledge-bases-card-open { display:block;border:0;background:transparent;font:500 18px Georgia,serif;
+ color:#946c37;text-align:left;margin:0 0 14px;padding:0 }
+.knowledge-bases-card-row { display:grid;grid-template-columns:minmax(65px, .45fr) minmax(0,1fr);gap:9px;
+ padding:7px 0;align-items:center;border-top:1px solid #f0e9de;font-size:12px;color:#8b7b64 }
+.knowledge-bases-card-row .knowledge-bases-cell-button { width:100% }
+@media(max-width:740px) {
+ .knowledge-bases-view-controls .btn,.knowledge-bases-schema .btn { flex:1 1 auto }
+ .knowledge-bases-view-controls select { flex:1 }
+ .knowledge-bases-editable { min-width:90px }
+}
