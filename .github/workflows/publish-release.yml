@@ -22,7 +22,7 @@ jobs:
           node --test tests/*.test.cjs
       - name: Assemble code-only release
         run: |
-          zip -q -r Amayurena-update.zip ./*.js ./*.css ./*.bat ./*.md ./*.json ./*.svg assets/avatars
+          zip -q -r Amayurena-update.zip *.js *.css *.bat *.md *.json *.svg assets/avatars
           sha256sum Amayurena-update.zip > Amayurena-update.zip.sha256
       - name: Publish stable release after tests
         env:
