@@ -190,9 +190,14 @@ function saveCanvas(root, name, data, expectedSha = undefined) {
   writeAtomic(filename, raw);
   return { ...next, sha:crypto.createHash("sha256").update(raw).digest("hex") };
 }
-function deleteCanvas(root, name) {
+function deleteCanvas(root, name, expectedSha = undefined) {
   const filename = canvasFile(root, name);
   if (!fs.existsSync(filename)) throw fail("Доска не найдена.", 404);
+  if (expectedSha !== undefined) {
+    if (typeof expectedSha !== "string" || !/^[a-f0-9]{64}$/.test(expectedSha)) throw fail("Недопустимая версия доски.");
+    const currentSha = crypto.createHash("sha256").update(fs.readFileSync(filename)).digest("hex");
+    if (currentSha !== expectedSha) throw fail("Доска изменена в другом окне. Удаление отменено.", 409);
+  }
   fs.unlinkSync(filename);
   return { deleted: name };
 }
