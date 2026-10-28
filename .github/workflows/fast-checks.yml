@@ -1,0 +1,20 @@
+name: Fast checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  agent-catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JavaScript syntax
+        run: |
+          node --check agents-core.js
+          node --check app.js
+          node --check tests/agents.test.cjs
+      - name: Run agent model tests
+        run: node --test tests/*.test.cjs

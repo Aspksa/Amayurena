@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf7f0">
+  <meta name="description" content="Amayurena — личное пространство управления ИИ-агентами.">
+  <title>Amayurena — Агенты</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./agents-core.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Боковое меню">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">✦</div>
+        <div><strong>Amayurena</strong><span>Личное пространство</span></div>
+      </div>
+      <div class="nav-caption">РАЗДЕЛЫ</div>
+      <nav class="menu" aria-label="Главное меню">
+        <button class="nav-link active" type="button" data-page="home" aria-current="page">
+          <span class="nav-icon" aria-hidden="true">⌂</span> Главная
+        </button>
+        <button class="nav-link" type="button" data-page="agents">
+          <span class="nav-icon" aria-hidden="true">✧</span> Агенты <span id="nav-count" class="nav-count">0</span>
+        </button>
+      </nav>
+      <p class="sidebar-note">Агенты хранятся локально в этом браузере. Создайте резервную копию для переноса.</p>
+      <div class="sidebar-bottom">AMAYURENA <span>v0.1.0</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+          <h1 id="page-title">Главная</h1>
+        </div>
+        <div class="topbar-mark" aria-hidden="true">✦</div>
+      </header>
+
+      <section id="home-view" class="view" aria-labelledby="home-heading">
+        <div class="hero">
+          <span class="pill">ПЕРВАЯ ВЕРСИЯ</span>
+          <h2 id="home-heading">Добро пожаловать в Amayurena</h2>
+          <p>Ваше пространство для создания и организации будущих ИИ-агентов. Начните с собственного каталога.</p>
+          <button id="go-agents" class="btn btn-primary" type="button">Открыть агентов <span aria-hidden="true">→</span></button>
+          <div class="hero-orb" aria-hidden="true">✧</div>
+        </div>
+        <div class="overview-grid">
+          <div class="panel metric"><span>Всего агентов</span><strong id="home-agent-count">0</strong><small>Сохранено в каталоге</small></div>
+          <div class="panel info"><span class="info-icon" aria-hidden="true">◈</span><div><strong>Каталог агентов</strong><p>Настройте имена, роли и системные инструкции. Запуск ИИ будет добавлен отдельно.</p></div></div>
+        </div>
+      </section>
+
+      <section id="agents-view" class="view" aria-labelledby="agents-heading" hidden>
+        <div class="section-header">
+          <div><div class="eyebrow">УПРАВЛЕНИЕ</div><h2 id="agents-heading">Мои агенты</h2><p>Создавайте персональных агентов и задавайте им задачи, роли и инструкции.</p></div>
+          <button id="create-agent" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> Создать агента</button>
+        </div>
+        <div class="notice"><span aria-hidden="true">ⓘ</span> Сейчас это каталог конфигураций. Подключение модели, выполнение задач и общение с агентами пока не реализованы.</div>
+        <div class="toolbar">
+          <label class="search-wrap"><span class="sr-only">Поиск агентов</span><span aria-hidden="true">⌕</span><input id="agent-search" type="search" placeholder="Поиск по имени, роли или описанию…" maxlength="100"></label>
+          <span id="result-count" class="result-count">0 агентов</span>
+          <div class="toolbar-actions">
+            <button id="export-agents" class="btn btn-soft" type="button">Экспорт JSON</button>
+            <button id="import-agents" class="btn btn-soft" type="button">Импорт JSON</button>
+            <input id="import-file" type="file" accept=".json,application/json" hidden>
+          </div>
+        </div>
+        <div id="empty-agents" class="empty-state" hidden>
+          <div class="empty-symbol" aria-hidden="true">✧</div>
+          <h3 id="empty-title">Здесь появятся ваши агенты</h3>
+          <p id="empty-subtitle">Создайте первого агента, назначьте ему роль и сохраните инструкции.</p>
+          <button id="empty-create" class="btn btn-primary" type="button">Создать первого агента</button>
+        </div>
+        <div id="agent-grid" class="agent-grid" aria-live="polite"></div>
+      </section>
+      <p id="storage-warning" class="storage-warning" role="alert" hidden></p>
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    </main>
+  </div>
+
+  <dialog id="agent-dialog" aria-labelledby="dialog-heading">
+    <form id="agent-form" novalidate>
+      <header class="dialog-header"><div><div class="eyebrow">КАРТОЧКА АГЕНТА</div><h2 id="dialog-heading">Новый агент</h2></div><button id="close-dialog" class="icon-button" type="button" aria-label="Закрыть">×</button></header>
+      <div class="dialog-body">
+        <label class="field">Имя агента <span>*</span><input id="agent-name" name="name" required maxlength="60" placeholder="Например, Архивариус" autocomplete="off"></label>
+        <label class="field">Роль <input id="agent-role" name="role" maxlength="60" placeholder="Например, Аналитик документов"></label>
+        <label class="field">Описание <textarea id="agent-description" name="description" rows="3" maxlength="400" placeholder="Чем этот агент будет заниматься"></textarea></label>
+        <label class="field">Системные инструкции <textarea id="agent-instructions" name="instructions" rows="6" maxlength="6000" placeholder="Задачи, правила поведения и ограничения агента"></textarea></label>
+        <p class="field-hint">Инструкции сохраняются в браузере, но ещё не передаются ИИ-модели. Не добавляйте сюда пароли или API-ключи.</p>
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+      </div>
+      <footer class="dialog-footer"><button id="cancel-dialog" class="btn btn-soft" type="button">Отмена</button><button class="btn btn-primary" type="submit">Сохранить агента</button></footer>
+    </form>
+  </dialog>
+</body>
+</html>
