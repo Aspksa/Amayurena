@@ -83,6 +83,18 @@ function restart(root=ROOT){
  child.unref();
  return true;
 }
+async function waitForServerExit(){
+ const flag=process.argv.find(x=>/^--wait-pid=\d+$/.test(x));
+ if(!flag)return;
+ const pid=Number(flag.split("=")[1]);
+ if(!Number.isSafeInteger(pid)||pid<=0)throw Error("Недопустимый идентификатор сервера.");
+ for(let i=0;i<180;i++){
+   try{process.kill(pid,0);}
+   catch(e){if(e.code==="ESRCH")return;throw e;}
+   await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ throw Error("Сервер не завершился для безопасного обновления. Проверьте открытые окна.");
+}
 async function main(){
  const action=process.argv[2]||"check";
  if(action==="recover"){
@@ -97,6 +109,7 @@ async function main(){
    return;
  }
  if(action!=="install")throw Error("Используйте check, install или recover.");
+ await waitForServerExit();
  const previous=core.restore(ROOT);
  if(previous.restored)console.log("Незавершённое обновление отменено, исходные файлы восстановлены.");
  const result=await update();
