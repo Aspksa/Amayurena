@@ -21,6 +21,7 @@
   <script defer src="./knowledge-canvas-layout.js"></script>
   <script defer src="./knowledge-canvas-enhance.js"></script>
   <script defer src="./knowledge-bases-math.js"></script>
+  <script defer src="./knowledge-bases-calendar.js"></script>
   <script defer src="./knowledge-advanced.js"></script>
   <script defer src="./knowledge-insights.js"></script>
   <script defer src="./knowledge.js"></script>
@@ -417,7 +418,7 @@
               <label for="knowledge-bases-group">Группировка:</label>
               <select id="knowledge-bases-group"><option value="">Без группировки</option></select>
               <label for="knowledge-bases-layout">Вид:</label>
-              <select id="knowledge-bases-layout"><option value="table">Таблица</option><option value="cards">Карточки</option><option value="calendar">Календарь (список дат)</option></select>
+              <select id="knowledge-bases-layout"><option value="table">Таблица</option><option value="cards">Карточки</option><option value="calendar">Календарь (месяц)</option></select>
             </div>
             <div class="knowledge-bases-schema">
               <label for="knowledge-bases-new-field">Новое поле:</label>
@@ -426,7 +427,7 @@
               <select id="knowledge-bases-type">
                 <option value="text">Текст</option><option value="number">Число</option>
                 <option value="date">Дата</option><option value="checkbox">Флажок</option>
-                <option value="select">Выбор</option><option value="tags">Метки</option>
+                <option value="select">Выбор</option><option value="tags">Метки</option><option value="relation">Связь с заметкой</option>
               </select>
               <button id="knowledge-bases-add-field" class="btn btn-soft" type="button">Добавить поле</button>
               <label for="knowledge-bases-formula-name">Вычисляемое поле:</label>
@@ -435,6 +436,14 @@
               <input id="knowledge-bases-formula-expression" maxlength="180" placeholder="price * quantity">
               <button id="knowledge-bases-add-formula" class="btn btn-soft" type="button">＋ Формула</button>
               <span id="knowledge-bases-message" role="status"></span>
+            </div>
+            <div id="knowledge-bases-calendar-controls" class="knowledge-bases-calendar-controls" hidden>
+              <label for="knowledge-bases-calendar-month">Месяц</label>
+              <input id="knowledge-bases-calendar-month" type="month">
+              <label for="knowledge-bases-calendar-field">Поле даты</label>
+              <select id="knowledge-bases-calendar-field"></select>
+              <button id="knowledge-bases-calendar-prev" type="button" class="btn btn-soft">←</button>
+              <button id="knowledge-bases-calendar-next" type="button" class="btn btn-soft">→</button>
             </div>
             <div id="knowledge-bases-aggregate" class="knowledge-bases-aggregate" role="status"></div>
             <p id="knowledge-bases-count" class="knowledge-advanced-help"></p>
