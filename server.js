@@ -26,17 +26,20 @@ function json(res, code, body) {
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let length = 0;
+    let oversized = false;
     const chunks = [];
     req.on("data", chunk => {
+      if (oversized) return;
       length += chunk.length;
       if (length > MAX_BODY_BYTES) {
+        oversized = true;
         reject(Object.assign(new Error("Запрос слишком большой."), { status: 413 }));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
     });
     req.on("end", () => {
+      if (oversized) return;
       try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))); }
       catch (_) { reject(Object.assign(new Error("Некорректный JSON."), { status: 400 })); }
     });
