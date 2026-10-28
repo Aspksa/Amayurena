@@ -95,6 +95,18 @@ test("stale approvals, unknown and self links are rejected without modifying not
     from,to:"../unknown.md",expectedSha:insights.sha(latest),targetSha:insights.sha(latest)}),{status:400});
   assert.equal(knowledge.read(s.notes,from).content,latest);
 }));
+test("approval rejects a changed target note even if source remains unchanged",()=>fixture(s=>{
+  seed(s);
+  const from="Гараж/Двигатель.md",to="Гараж/Ремонт.md";
+  const source=knowledge.read(s.notes,from).content;
+  const oldTarget=knowledge.read(s.notes,to).content;
+  knowledge.save(s.notes,to,oldTarget+"\nНовый факт от другого редактора.");
+  assert.throws(()=>insights.accept(s.notes,s.history,s.canvas,{
+    from,to,expectedSha:insights.sha(source),targetSha:insights.sha(oldTarget)
+  }),{status:409});
+  assert.equal(knowledge.read(s.notes,from).content,source);
+  assert.equal(advanced.history(s.history,from).length,0);
+}));
 test("empty vault and bounded analysis remain deterministic with no writes",()=>fixture(s=>{
   const empty=insights.analyze(s.notes,s.canvas,s.history);
   assert.deepEqual(empty.nodes,[]);
