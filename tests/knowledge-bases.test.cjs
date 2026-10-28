@@ -126,6 +126,13 @@ test("HTTP editing, saved views and conflict protection; cross-origin requests b
       {path:"A.md",key:"priority",type:"number",value:3,expectedSha:record.sha});
     assert.equal(r.status,409);
     r=await fetch(base+"/api/knowledge/bases");
+    const table=await r.json();
+    assert.equal(table.rows[0].properties.priority,"2");
+    assert.equal(table.rows[0].sha,bases.digest("---\npriority: 2\n---\n# A"));
+    r=await post(base,"/api/knowledge/bases/property",
+      {path:"A.md",key:"priority",type:"number",value:9,expectedSha:record.sha});
+    assert.equal(r.status,409);
+    r=await fetch(base+"/api/knowledge/bases");
     assert.equal((await r.json()).rows[0].properties.priority,"2");
     r=await fetch(base+"/api/knowledge/bases/settings");
     const settings=await r.json();
