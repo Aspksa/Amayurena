@@ -7,6 +7,8 @@ const knowledge = require("./knowledge-core");
 const MAX_HISTORY = 20;
 const MAX_CANVAS_NODES = 60;
 const MAX_CANVAS_EDGES = 120;
+const MAX_CANVAS_GROUPS = 20;
+const CANVAS_TONES = ["gold", "blue", "green", "rose"];
 
 function fail(message, status = 400) { return Object.assign(new Error(message), { status }); }
 function dirSafe(folder) {
@@ -105,15 +107,36 @@ function validCanvas(name, data) {
   canvasName(name);
   if (!data || typeof data !== "object" || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) throw fail("Неправильный формат Canvas.");
   if (data.nodes.length > MAX_CANVAS_NODES || data.edges.length > MAX_CANVAS_EDGES) throw fail("Превышен размер доски.", 413);
+  if (data.groups !== undefined && !Array.isArray(data.groups)) throw fail("Неверный список групп Canvas.");
+  const inputs = data.groups || [];
+  if (inputs.length > MAX_CANVAS_GROUPS) throw fail("На доске максимум 20 групп.", 413);
+  const groupIds = new Set();
+  const groups = inputs.map(g => {
+    if (!g || typeof g.id !== "string" || !/^[\w-]{1,64}$/.test(g.id) || groupIds.has(g.id) ||
+        typeof g.label !== "string" || !g.label.trim() || g.label.length > 70 ||
+        !["gold","blue","green","rose"].includes(g.tone || "gold") ||
+        !Number.isInteger(g.x) || !Number.isInteger(g.y) ||
+        !Number.isInteger(g.width) || !Number.isInteger(g.height) ||
+        g.width < 280 || g.height < 180 || g.x < 0 || g.y < 0 ||
+        g.x + g.width > 3500 || g.y + g.height > 2600) throw fail("Недопустимая группа Canvas.");
+    groupIds.add(g.id);
+    return { id:g.id, label:g.label.trim(), tone:g.tone || "gold", x:g.x, y:g.y,
+      width:g.width, height:g.height };
+  });
   const ids = new Set();
   const nodes = data.nodes.map(n => {
     if (!n || !/^[\w-]{1,64}$/.test(n.id) || ids.has(n.id) ||
         !["text", "file"].includes(n.type) || !Number.isInteger(n.x) || !Number.isInteger(n.y) ||
         n.x < 0 || n.y < 0 || n.x > 3200 || n.y > 2400) throw fail("Недопустимая карточка Canvas.");
     ids.add(n.id);
-    if (n.type === "file") return { id: n.id, type: n.type, x: n.x, y: n.y, file: knowledge.normalizePath(n.file) };
+    if (n.groupId !== undefined && (typeof n.groupId !== "string" || !groupIds.has(n.groupId))) {
+      throw fail("Карточка ссылается на отсутствующую группу.");
+    }
+    const base = { id:n.id, type:n.type, x:n.x, y:n.y };
+    if (n.groupId) base.groupId=n.groupId;
+    if (n.type === "file") return { ...base, file:knowledge.normalizePath(n.file) };
     if (typeof n.text !== "string" || n.text.length > 2500) throw fail("Слишком большой текст карточки.");
-    return { id: n.id, type: n.type, x: n.x, y: n.y, text: n.text };
+    return { ...base, text:n.text };
   });
   const seen = new Set();
   const edges = data.edges.map(e => {
@@ -123,7 +146,7 @@ function validCanvas(name, data) {
     seen.add(key);
     return { from: e.from, to: e.to };
   });
-  const normalized = { name, nodes, edges, updatedAt: new Date().toISOString() };
+  const normalized = { name, nodes, edges, groups, updatedAt: new Date().toISOString() };
   if (Buffer.byteLength(JSON.stringify(normalized), "utf8") > 115000) throw fail("Canvas слишком большой.", 413);
   return normalized;
 }
@@ -142,17 +165,39 @@ function readCanvas(root, name) {
   const filename = canvasFile(root, name);
   if (!fs.existsSync(filename)) throw fail("Доска не найдена.", 404);
   if (fs.statSync(filename).size > 115000) throw fail("Canvas слишком большой.", 413);
-  const data = JSON.parse(fs.readFileSync(filename, "utf8"));
-  return { ...validCanvas(name, data), updatedAt: data.updatedAt || "" };
+  const raw = fs.readFileSync(filename, "utf8");
+  const data = JSON.parse(raw);
+  return { ...validCanvas(name, data), updatedAt: data.updatedAt || "",
+    sha:crypto.createHash("sha256").update(raw).digest("hex") };
 }
-function saveCanvas(root, name, data) {
+function saveCanvas(root, name, data, expectedSha = undefined) {
   const next = validCanvas(name, data);
-  writeAtomic(canvasFile(root, name), JSON.stringify(next, null, 2));
-  return next;
+  const filename = canvasFile(root, name);
+  if (expectedSha !== undefined) {
+    if (expectedSha !== null && (typeof expectedSha !== "string" || !/^[a-f0-9]{64}$/.test(expectedSha))) {
+      throw fail("Неверная версия доски.");
+    }
+    const exists = fs.existsSync(filename);
+    if (expectedSha === null && exists) throw fail("Доска уже существует.", 409);
+    if (expectedSha !== null) {
+      if (!exists) throw fail("Доска была удалена. Сохранение отменено.", 409);
+      const raw = fs.readFileSync(filename);
+      const currentSha = crypto.createHash("sha256").update(raw).digest("hex");
+      if (currentSha !== expectedSha) throw fail("Доска изменена в другом окне. Сохранение отменено.", 409);
+    }
+  }
+  const raw = JSON.stringify(next, null, 2);
+  writeAtomic(filename, raw);
+  return { ...next, sha:crypto.createHash("sha256").update(raw).digest("hex") };
 }
-function deleteCanvas(root, name) {
+function deleteCanvas(root, name, expectedSha = undefined) {
   const filename = canvasFile(root, name);
   if (!fs.existsSync(filename)) throw fail("Доска не найдена.", 404);
+  if (expectedSha !== undefined) {
+    if (typeof expectedSha !== "string" || !/^[a-f0-9]{64}$/.test(expectedSha)) throw fail("Недопустимая версия доски.");
+    const currentSha = crypto.createHash("sha256").update(fs.readFileSync(filename)).digest("hex");
+    if (currentSha !== expectedSha) throw fail("Доска изменена в другом окне. Удаление отменено.", 409);
+  }
   fs.unlinkSync(filename);
   return { deleted: name };
 }

@@ -8,8 +8,8 @@
     return el;
   };
   const config = { notes: [], active: "", columns: [], rows: [], callbacks: {}, initialized: false };
-  const canvas = { name: "", board: null, boards: [], pending: null, queue: Promise.resolve(),
-    dirty: 0, saved: 0, connecting: "", timer: null };
+  const canvas = { name: "", board: null, boards: [], queue: Promise.resolve(), navigation: Promise.resolve(),
+    dirty: 0, saved: 0, connecting: "", timer: null, sha: null, zoom: 1, transitioning: false };
   let historyToken = 0;
   const basesState = { types: {}, views: [], sha: "", currentView: "", busy: false };
   const basesTypes = ["text", "number", "date", "checkbox", "select", "tags"];
@@ -96,28 +96,45 @@
     } else if (active) void renderHistory();
   }
 
+  const layout = window.AmayurenaCanvasLayout;
   function canvasStatus(text) { $("knowledge-canvas-status").textContent = text; }
+  const viewport = () => $("knowledge-canvas-viewport");
   function canvasSave() {
-    if (!canvas.board || canvas.dirty <= canvas.saved) return canvas.queue;
     clearTimeout(canvas.timer);
-    const name = canvas.name;
-    const data = JSON.parse(JSON.stringify(canvas.board));
-    const revision = canvas.dirty;
+    if (!canvas.board || canvas.dirty <= canvas.saved) return canvas.queue;
+    const board = canvas.board, name = canvas.name, revision = canvas.dirty;
+    const data = JSON.parse(JSON.stringify(board));
     canvas.queue = canvas.queue.catch(() => {}).then(async () => {
-      await api("/api/knowledge/canvas", { name, board: data });
-      if (name === canvas.name && revision >= canvas.saved) {
-        canvas.saved = revision; canvasStatus("Доска сохранена на диске.");
-      }
-    }).catch(e => canvasStatus("Не удалось сохранить: " + e.message));
+      if (canvas.board !== board || canvas.name !== name || revision <= canvas.saved) return;
+      const result = await api("/api/knowledge/canvas", { name, board: data, expectedSha: canvas.sha });
+      canvas.sha = result.sha;
+      canvas.saved = Math.max(canvas.saved, revision);
+      canvasStatus(canvas.dirty > canvas.saved ? "На доске есть новые несохранённые изменения." : "Доска сохранена на диске.");
+    });
     return canvas.queue;
+  }
+  async function flushCanvas() {
+    clearTimeout(canvas.timer);
+    while (canvas.board && canvas.dirty > canvas.saved) {
+      try { await canvasSave(); }
+      catch (e) {
+        canvasStatus("Сохранение не выполнено: " + e.message + ". Переключение заблокировано.");
+        throw e;
+      }
+    }
+    await canvas.queue;
   }
   function canvasChanged() {
     canvas.dirty++;
-    canvasStatus("Изменения не сохранены…");
+    canvasStatus("Изменения доски ожидают сохранения…");
     clearTimeout(canvas.timer);
-    canvas.timer = setTimeout(() => { void canvasSave(); }, 500);
+    canvas.timer = setTimeout(() => {
+      void canvasSave().catch(e => canvasStatus("Не удалось сохранить: " + e.message + ". Повторите сохранение."));
+    }, 550);
+    renderMinimap();
   }
-  function uid() { return "n_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); }
+  function uid(prefix = "n") { return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); }
+  function groupAt(id) { return (canvas.board.groups || []).find(g => g.id === id); }
   function drawEdges() {
     const layer = $("knowledge-canvas-edges");
     layer.replaceChildren();
@@ -133,149 +150,321 @@
       layer.append(line);
     }
   }
+  function storeZoom() {
+    if (!canvas.name) return;
+    try { localStorage.setItem("amayu.canvas.zoom." + encodeURIComponent(canvas.name), String(canvas.zoom)); }
+    catch (_) { /* zoom preference is optional */ }
+  }
+  function setZoom(value, preserveCenter = true) {
+    const scroller = viewport(), old = canvas.zoom;
+    const target = layout.zoom(value);
+    const dimensions = preserveCenter ?
+      layout.viewAt(old,target,scroller.scrollLeft,scroller.scrollTop,scroller.clientWidth,scroller.clientHeight) :
+      { zoom:target,left:scroller.scrollLeft,top:scroller.scrollTop };
+    canvas.zoom = target;
+    const space = $("knowledge-canvas-space");
+    space.style.width = layout.WIDTH * target + "px";
+    space.style.height = layout.HEIGHT * target + "px";
+    const surface = space.querySelector(".knowledge-canvas-surface");
+    surface.style.transform = "scale(" + target + ")";
+    scroller.scrollLeft = dimensions.left;
+    scroller.scrollTop = dimensions.top;
+    $("knowledge-canvas-zoom-label").textContent = Math.round(target*100) + "%";
+    storeZoom();
+    renderMinimap();
+  }
+  function svgRect(parent, attrs) {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    for (const [key,value] of Object.entries(attrs)) rect.setAttribute(key, String(value));
+    parent.append(rect);
+  }
+  function renderMinimap() {
+    const svg = $("knowledge-canvas-minimap"), scroller=viewport();
+    svg.replaceChildren();
+    svgRect(svg,{x:0,y:0,width:200,height:150,fill:"#fbf6ea"});
+    if (canvas.board) {
+      for (const g of canvas.board.groups || []) svgRect(svg,{
+        x:g.x/layout.WIDTH*200,y:g.y/layout.HEIGHT*150,
+        width:g.width/layout.WIDTH*200,height:g.height/layout.HEIGHT*150,
+        fill:"#e8d2a9",stroke:"#c7a16d","stroke-width":0.7,rx:2
+      });
+      for (const n of canvas.board.nodes) svgRect(svg,{
+        x:n.x/layout.WIDTH*200,y:n.y/layout.HEIGHT*150,
+        width:layout.CARD_W/layout.WIDTH*200,height:layout.CARD_H/layout.HEIGHT*150,
+        fill:n.type==="file"?"#9c9bba":"#bb9150",rx:1
+      });
+    }
+    const box=layout.minimapRect(scroller.scrollLeft,scroller.scrollTop,
+      scroller.clientWidth,scroller.clientHeight,canvas.zoom);
+    svgRect(svg,{x:box.x,y:box.y,width:box.width,height:box.height,
+      fill:"none",stroke:"#7d482a","stroke-width":2,"pointer-events":"none"});
+  }
+  function panTo(x,y) {
+    const scroller=viewport();
+    scroller.scrollLeft=layout.clamp(x*canvas.zoom-scroller.clientWidth/2,0,
+      Math.max(0,layout.WIDTH*canvas.zoom-scroller.clientWidth));
+    scroller.scrollTop=layout.clamp(y*canvas.zoom-scroller.clientHeight/2,0,
+      Math.max(0,layout.HEIGHT*canvas.zoom-scroller.clientHeight));
+    renderMinimap();
+  }
+  function fitBoard() {
+    if (!canvas.board) { setZoom(1); return; }
+    const elements=[...canvas.board.nodes.map(n=>({x:n.x,y:n.y,width:layout.CARD_W,height:layout.CARD_H})),
+      ...(canvas.board.groups||[])];
+    if (!elements.length) { setZoom(1);panTo(350,250);return; }
+    const minX=Math.min(...elements.map(x=>x.x)),maxX=Math.max(...elements.map(x=>x.x+x.width));
+    const minY=Math.min(...elements.map(x=>x.y)),maxY=Math.max(...elements.map(x=>x.y+x.height));
+    const scroller=viewport();
+    setZoom(Math.min((scroller.clientWidth-55)/(maxX-minX+40),
+      (scroller.clientHeight-55)/(maxY-minY+40),1.7));
+    panTo((minX+maxX)/2,(minY+maxY)/2);
+  }
   function connect(id) {
-    if (!canvas.connecting) { canvas.connecting = id; canvasStatus("Выберите вторую карточку для связи."); return; }
-    const source = canvas.connecting;
-    canvas.connecting = "";
-    if (source === id) { canvasStatus("Выберите разные карточки."); return; }
-    if (!canvas.board.edges.some(e => e.from === source && e.to === id)) {
-      canvas.board.edges.push({ from: source, to: id });
-      canvasChanged(); renderCanvas();
+    if (canvas.transitioning) return;
+    if (!canvas.connecting) { canvas.connecting=id; canvasStatus("Выберите вторую карточку для связи.");return; }
+    const from=canvas.connecting;canvas.connecting="";
+    if (from===id) { canvasStatus("Свяжите две разные карточки.");return; }
+    if (canvas.board.edges.length>=120) { canvasStatus("Максимум 120 связей.");return; }
+    if (!canvas.board.edges.some(e=>e.from===from && e.to===id)) {
+      canvas.board.edges.push({from,to:id});canvasChanged();renderCanvas();
     }
   }
-  function draggable(handle, element, record) {
-    handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
+  function drag(handle, record, movingGroup=false) {
+    handle.addEventListener("pointerdown", event=>{
+      if (canvas.transitioning || event.button!==0) return;
       event.preventDefault();
-      const startX = event.clientX, startY = event.clientY, origX = record.x, origY = record.y;
-      const pointer = event.pointerId;
+      const pointer=event.pointerId,sx=event.clientX,sy=event.clientY;
+      const x=record.x,y=record.y;
+      const members=movingGroup ? canvas.board.nodes.filter(n=>n.groupId===record.id).map(n=>({node:n,x:n.x,y:n.y})) : [];
+      let moved=false;
       handle.setPointerCapture(pointer);
-      const move = e => {
-        if (e.pointerId !== pointer) return;
-        record.x = Math.max(0, Math.min(3200, Math.round(origX + e.clientX - startX)));
-        record.y = Math.max(0, Math.min(2400, Math.round(origY + e.clientY - startY)));
-        element.style.left = record.x + "px";
-        element.style.top = record.y + "px";
-        drawEdges();
+      const motion=e=>{
+        if (e.pointerId!==pointer) return;
+        const dx=Math.round((e.clientX-sx)/canvas.zoom),dy=Math.round((e.clientY-sy)/canvas.zoom);
+        const nx=layout.clamp(x+dx,0,movingGroup?layout.WIDTH-record.width:3200);
+        const ny=layout.clamp(y+dy,0,movingGroup?layout.HEIGHT-record.height:2400);
+        if (nx===record.x && ny===record.y) return;
+        record.x=nx;record.y=ny;moved=true;
+        const shiftX=nx-x,shiftY=ny-y;
+        for (const member of members) {
+          member.node.x=layout.clamp(member.x+shiftX,0,3200);
+          member.node.y=layout.clamp(member.y+shiftY,0,2400);
+        }
+        renderPositions();drawEdges();renderMinimap();
       };
-      const end = e => {
-        if (e.pointerId !== pointer) return;
-        handle.removeEventListener("pointermove", move);
-        handle.removeEventListener("pointerup", end);
-        handle.removeEventListener("pointercancel", end);
-        canvasChanged();
+      const finish=e=>{
+        if (e.pointerId!==pointer)return;
+        handle.removeEventListener("pointermove",motion);
+        handle.removeEventListener("pointerup",finish);
+        handle.removeEventListener("pointercancel",finish);
+        if (handle.hasPointerCapture(pointer))handle.releasePointerCapture(pointer);
+        if (moved)canvasChanged();
       };
-      handle.addEventListener("pointermove", move);
-      handle.addEventListener("pointerup", end);
-      handle.addEventListener("pointercancel", end);
+      handle.addEventListener("pointermove",motion);
+      handle.addEventListener("pointerup",finish);
+      handle.addEventListener("pointercancel",finish);
     });
   }
-  function renderCanvas() {
-    const container = $("knowledge-canvas-nodes");
-    container.replaceChildren();
-    if (!canvas.board) return;
-    for (const record of canvas.board.nodes) {
-      const card = mk("article", "knowledge-canvas-node");
-      card.style.left = record.x + "px";
-      card.style.top = record.y + "px";
-      const handle = mk("div", "knowledge-canvas-grip", "⋮⋮ Переместить");
-      card.append(handle); draggable(handle, card, record);
-      const body = mk("div", "knowledge-canvas-text", record.type === "file" ? "◇ " + record.file : record.text);
-      card.append(body);
-      const buttons = mk("div", "knowledge-canvas-card-actions");
-      function btn(label, callback) {
-        const button = mk("button", "", label); button.type = "button";
-        button.addEventListener("click", callback); buttons.append(button);
-      }
-      if (record.type === "file") btn("Открыть", () => { void config.callbacks.onNoteOpen(record.file); });
-      if (record.type === "text") btn("Изменить", () => {
-        const updated = prompt("Текст карточки:", record.text);
-        if (updated === null) return;
-        if (updated.length > 2500) { canvasStatus("Максимум 2500 символов."); return; }
-        record.text = updated; canvasChanged(); renderCanvas();
-      });
-      btn("Связать", () => connect(record.id));
-      btn("×", () => {
-        if (!confirm("Удалить карточку и её связи?")) return;
-        canvas.board.nodes = canvas.board.nodes.filter(n => n.id !== record.id);
-        canvas.board.edges = canvas.board.edges.filter(e => e.from !== record.id && e.to !== record.id);
-        canvasChanged(); renderCanvas();
-      });
-      card.append(buttons);
-      container.append(card);
+  function renderPositions() {
+    const byId=new Map(canvas.board.nodes.map(n=>[n.id,n]));
+    for (const el of $("knowledge-canvas-nodes").children) {
+      const item=byId.get(el.dataset.id);
+      if (item){el.style.left=item.x+"px";el.style.top=item.y+"px";}
     }
-    drawEdges();
+    const groups=new Map(canvas.board.groups.map(g=>[g.id,g]));
+    for (const el of $("knowledge-canvas-groups").children) {
+      const item=groups.get(el.dataset.id);
+      if (item){el.style.left=item.x+"px";el.style.top=item.y+"px";}
+    }
+  }
+  function groupCard(node) {
+    if (canvas.transitioning) return;
+    const choices=canvas.board.groups.map(g=>g.label).join(", ");
+    if (!canvas.board.groups.length) {canvasStatus("Создайте группу кнопкой «＋ Группа».");return;}
+    const current=groupAt(node.groupId);
+    const result=prompt("Выберите группу по названию: "+choices+". Пусто — убрать из группы.",current?.label||"");
+    if (result===null)return;
+    const label=result.trim();
+    if (!label) delete node.groupId;
+    else {
+      const g=canvas.board.groups.find(item=>item.label.toLocaleLowerCase("ru")===label.toLocaleLowerCase("ru"));
+      if (!g) {canvasStatus("Группа с таким названием не найдена.");return;}
+      node.groupId=g.id;
+      const members=canvas.board.nodes.filter(n=>n.groupId===g.id);
+      const i=members.indexOf(node);
+      node.x=layout.clamp(g.x+20+(i%3)*245,0,3200);
+      node.y=layout.clamp(g.y+52+Math.floor(i/3)*165,0,2400);
+    }
+    canvasChanged();renderCanvas();
+  }
+  function renderCanvas() {
+    const container=$("knowledge-canvas-nodes"), groups=$("knowledge-canvas-groups");
+    container.replaceChildren();groups.replaceChildren();
+    if (!canvas.board){drawEdges();renderMinimap();return;}
+    for (const g of canvas.board.groups || []) {
+      const element=mk("section","knowledge-canvas-group knowledge-canvas-group-"+g.tone);
+      element.dataset.id=g.id;
+      element.style.left=g.x+"px";element.style.top=g.y+"px";
+      element.style.width=g.width+"px";element.style.height=g.height+"px";
+      const heading=mk("div","knowledge-canvas-group-heading");
+      const grip=mk("span","knowledge-canvas-group-grip","⋮⋮ "+g.label);
+      grip.title="Переместить группу с карточками";
+      drag(grip,g,true);
+      const rename=mk("button","","✎");rename.type="button";rename.title="Переименовать группу";
+      rename.addEventListener("click",()=>{
+        const name=prompt("Название группы:",g.label);
+        if (name===null)return;
+        if (!name.trim()||name.trim().length>70){canvasStatus("Название от 1 до 70 символов.");return;}
+        g.label=name.trim();canvasChanged();renderCanvas();
+      });
+      const del=mk("button","","×");del.type="button";del.title="Удалить группу, сохранив карточки";
+      del.addEventListener("click",()=>{
+        if (!confirm("Убрать группу «"+g.label+"»? Карточки сохранятся."))return;
+        canvas.board.groups=canvas.board.groups.filter(item=>item.id!==g.id);
+        for (const n of canvas.board.nodes)if(n.groupId===g.id)delete n.groupId;
+        canvasChanged();renderCanvas();
+      });
+      heading.append(grip,rename,del);element.append(heading);groups.append(element);
+    }
+    for (const record of canvas.board.nodes) {
+      const card=mk("article","knowledge-canvas-node");
+      card.dataset.id=record.id;
+      card.style.left=record.x+"px";card.style.top=record.y+"px";
+      const handle=mk("div","knowledge-canvas-grip","⋮⋮ Переместить");
+      card.append(handle);drag(handle,record);
+      card.append(mk("div","knowledge-canvas-text",record.type==="file"?"◇ "+record.file:record.text));
+      const buttons=mk("div","knowledge-canvas-card-actions");
+      function btn(label,callback){const b=mk("button","",label);b.type="button";b.addEventListener("click",callback);buttons.append(b);}
+      if(record.type==="file")btn("Открыть",()=>{void config.callbacks.onNoteOpen(record.file);});
+      if(record.type==="text")btn("Изменить",()=>{
+        if (canvas.transitioning)return;
+        const changed=prompt("Текст карточки:",record.text);
+        if(changed===null)return;
+        if(changed.length>2500){canvasStatus("Максимум 2500 символов.");return;}
+        record.text=changed;canvasChanged();renderCanvas();
+      });
+      btn(groupAt(record.groupId)?"Группа: "+groupAt(record.groupId).label:"В группу",()=>groupCard(record));
+      btn("Связать",()=>connect(record.id));
+      btn("×",()=>{
+        if(canvas.transitioning||!confirm("Удалить карточку и её связи?"))return;
+        canvas.board.nodes=canvas.board.nodes.filter(n=>n.id!==record.id);
+        canvas.board.edges=canvas.board.edges.filter(e=>e.from!==record.id&&e.to!==record.id);
+        canvasChanged();renderCanvas();
+      });
+      card.append(buttons);container.append(card);
+    }
+    drawEdges();renderMinimap();
   }
   async function listBoards() {
-    const data = await api("/api/knowledge/canvases");
-    canvas.boards = data.boards || [];
-    const select = $("knowledge-canvas-select");
+    const data=await api("/api/knowledge/canvases");
+    canvas.boards=data.boards||[];
+    const select=$("knowledge-canvas-select");
     select.replaceChildren();
-    select.append(mk("option", "", "Выберите доску"));
-    select.firstElementChild.value = "";
+    const placeholder=mk("option","","Выберите доску");placeholder.value="";select.append(placeholder);
     for (const item of canvas.boards) {
-      const opt = mk("option", "", item.name); opt.value = item.name;
-      select.append(opt);
+      const opt=mk("option","",item.name);opt.value=item.name;select.append(opt);
     }
-    select.value = canvas.name;
+    select.value=canvas.name;
   }
-  async function loadBoard(name) {
-    await canvasSave();
-    if (canvas.board && canvas.dirty > canvas.saved) { canvasStatus("Сохранение не удалось; переключение отменено."); return; }
-    canvas.name = name;
-    canvas.board = name ? await api(query("/api/knowledge/canvas", "name", name)) : null;
-    canvas.dirty = 0; canvas.saved = 0;
-    $("knowledge-canvas-select").value = name;
-    renderCanvas();
-    canvasStatus(name ? "Доска «" + name + "» загружена." : "Создайте доску Canvas.");
+  async function loadDirect(name) {
+    const loaded=name ? await api(query("/api/knowledge/canvas","name",name)) : null;
+    canvas.name=name;
+    canvas.board=loaded?{nodes:loaded.nodes,edges:loaded.edges,groups:loaded.groups||[]}:null;
+    canvas.sha=loaded?loaded.sha:null;
+    canvas.dirty=0;canvas.saved=0;canvas.connecting="";
+    $("knowledge-canvas-select").value=name;
+    let savedZoom=1;
+    try { savedZoom=Number(localStorage.getItem("amayu.canvas.zoom."+encodeURIComponent(name)))||1; }catch(_){}
+    setZoom(savedZoom,false);renderCanvas();
+    if (canvas.board && (canvas.board.groups.length || canvas.board.nodes.length)) {
+      const first=canvas.board.groups[0] || canvas.board.nodes[0];
+      panTo(first.x+110,first.y+80);
+    } else panTo(380,270);
+    canvasStatus(name?"Доска «"+name+"» загружена.":"Создайте доску Canvas.");
   }
-  async function openCanvas() {
-    try {
+  function navigateCanvas(fn) {
+    canvas.navigation=canvas.navigation.catch(()=>{}).then(async()=>{
+      canvas.transitioning=true;
+      try {await flushCanvas();return await fn();}
+      catch(e){
+        $("knowledge-canvas-select").value=canvas.name;
+        canvasStatus("Операция отменена: "+e.message+". Несохранённая доска осталась открытой.");
+        return false;
+      } finally {canvas.transitioning=false;}
+    });
+    return canvas.navigation;
+  }
+  function loadBoard(name) {return navigateCanvas(()=>loadDirect(name));}
+  function openCanvas() {
+    return navigateCanvas(async()=>{
       await listBoards();
-      if (!canvas.board && canvas.boards.length) await loadBoard(canvas.boards[0].name);
-    } catch (e) { canvasStatus("Ошибка Canvas: " + e.message); }
+      if(!canvas.board&&canvas.boards.length)await loadDirect(canvas.boards[0].name);
+    });
   }
   async function createBoard() {
-    const name = prompt("Название новой доски Canvas:");
-    if (name === null || !name.trim()) return;
-    const cleaned = name.trim();
-    if (canvas.boards.some(b => b.name.toLowerCase() === cleaned.toLowerCase())) {
-      canvasStatus("Доска уже существует."); return;
-    }
-    try {
-      await canvasSave();
-      if (canvas.board && canvas.dirty > canvas.saved) return;
-      await api("/api/knowledge/canvas", { name: cleaned, board: { nodes: [], edges: [] } });
-      await listBoards();
-      await loadBoard(cleaned);
-    } catch (e) { canvasStatus(e.message); }
+    const requested=prompt("Название новой доски Canvas:");
+    if(requested===null||!requested.trim())return;
+    const name=requested.trim();
+    await navigateCanvas(async()=>{
+      if(canvas.boards.some(b=>b.name.toLocaleLowerCase("ru")===name.toLocaleLowerCase("ru"))){
+        throw Error("Доска уже существует.");
+      }
+      await api("/api/knowledge/canvas",{name,board:{nodes:[],edges:[],groups:[]},expectedSha:null});
+      await listBoards();await loadDirect(name);
+    });
   }
-  async function deleteBoard() {
-    if (!canvas.name || !confirm("Удалить доску Canvas «" + canvas.name + "»?")) return;
-    const name = canvas.name;
-    try {
-      await canvasSave();
-      if (canvas.dirty > canvas.saved) { canvasStatus("Удаление отменено: изменения не сохранены."); return; }
-      clearTimeout(canvas.timer);
-      await api(query("/api/knowledge/canvas", "name", name), undefined, "DELETE");
-      canvas.board = null; canvas.name = ""; canvas.dirty = 0; canvas.saved = 0;
-      await listBoards(); renderCanvas(); canvasStatus("Доска удалена.");
-    } catch (e) { canvasStatus(e.message); }
+  function deleteBoard() {
+    if(!canvas.name||!confirm("Удалить доску Canvas «"+canvas.name+"»?"))return Promise.resolve();
+    return navigateCanvas(async()=>{
+      const name=canvas.name;
+      await api(query("/api/knowledge/canvas","name",name)+"&expectedSha="+encodeURIComponent(canvas.sha),
+        undefined,"DELETE");
+      canvas.board=null;canvas.name="";canvas.sha=null;canvas.dirty=0;canvas.saved=0;
+      await listBoards();renderCanvas();
+      canvasStatus("Доска удалена.");
+    });
   }
   function addNode(type) {
-    if (!canvas.board) { canvasStatus("Сначала создайте доску."); return; }
-    if (canvas.board.nodes.length >= 60) { canvasStatus("На одной доске максимум 60 карточек."); return; }
-    let content = type === "text" ? prompt("Текст карточки Canvas:") :
-      prompt("Путь к заметке для карточки:", config.notes[0]?.path || "");
-    if (content === null || !content.trim()) return;
-    content = content.trim();
-    if (type === "text" && content.length > 2500) { canvasStatus("Максимум 2500 символов."); return; }
-    if (type === "file" && !config.notes.some(n => n.path === content)) { canvasStatus("Указанная заметка не найдена."); return; }
-    const index = canvas.board.nodes.length;
-    const record = { id: uid(), type, x: 35 + (index % 5) * 260, y: 35 + Math.floor(index / 5) * 180 };
-    if (type === "text") record.text = content; else record.file = content;
-    canvas.board.nodes.push(record);
-    canvasChanged(); renderCanvas();
+    if(!canvas.board||canvas.transitioning){canvasStatus("Сначала создайте доску.");return;}
+    if(canvas.board.nodes.length>=60){canvasStatus("Максимум 60 карточек.");return;}
+    let value=type==="text"?prompt("Текст карточки Canvas:"):
+      prompt("Путь существующей заметки:",config.notes[0]?.path||"");
+    if(value===null||!value.trim())return;
+    value=value.trim();
+    if(type==="text"&&value.length>2500){canvasStatus("Максимум 2500 символов.");return;}
+    if(type==="file"&&!config.notes.some(n=>n.path===value)){canvasStatus("Заметка не найдена.");return;}
+    const scroller=viewport();
+    const index=canvas.board.nodes.length;
+    const record={id:uid(),type,x:layout.clamp(Math.round(scroller.scrollLeft/canvas.zoom+50+(index%3)*250),0,3200),
+      y:layout.clamp(Math.round(scroller.scrollTop/canvas.zoom+50+Math.floor(index%3)*170),0,2400)};
+    if(type==="text")record.text=value;else record.file=value;
+    canvas.board.nodes.push(record);canvasChanged();renderCanvas();
+  }
+  function addGroup() {
+    if(!canvas.board||canvas.transitioning){canvasStatus("Выберите доску.");return;}
+    if(canvas.board.groups.length>=20){canvasStatus("Максимум 20 групп.");return;}
+    const value=prompt("Название новой группы:");
+    if(value===null||!value.trim())return;
+    const label=value.trim();
+    if(label.length>70){canvasStatus("Название группы слишком длинное.");return;}
+    if(canvas.board.groups.some(g=>g.label.toLocaleLowerCase("ru")===label.toLocaleLowerCase("ru"))){
+      canvasStatus("Группа с таким названием уже существует.");return;
+    }
+    const scroller=viewport();
+    canvas.board.groups.push({id:uid("g"),label,tone:["gold","blue","green","rose"][canvas.board.groups.length%4],
+      x:layout.clamp(Math.round(scroller.scrollLeft/canvas.zoom+40),0,layout.WIDTH-520),
+      y:layout.clamp(Math.round(scroller.scrollTop/canvas.zoom+40),0,layout.HEIGHT-350),
+      width:520,height:350});
+    canvasChanged();renderCanvas();
+  }
+  function autoArrange() {
+    if(!canvas.board||canvas.transitioning)return;
+    if(!confirm("Автоматически расположить группы и карточки? Их текущие координаты изменятся."))return;
+    try {
+      const arranged=layout.arrange(canvas.board);
+      canvas.board=arranged;
+      canvasChanged();renderCanvas();fitBoard();
+    } catch (e) { canvasStatus("Не удалось упорядочить: "+e.message); }
   }
 
   function basesStatus(text, bad = false) {
@@ -591,7 +780,60 @@
     $("knowledge-canvas-delete").addEventListener("click", () => { void deleteBoard(); });
     $("knowledge-canvas-text").addEventListener("click", () => addNode("text"));
     $("knowledge-canvas-file").addEventListener("click", () => addNode("file"));
-    $("knowledge-canvas-save").addEventListener("click", () => { void canvasSave(); });
+    $("knowledge-canvas-save").addEventListener("click", () => {
+      void flushCanvas().catch(e => canvasStatus("Не сохранено: "+e.message));
+    });
+    $("knowledge-canvas-group").addEventListener("click",addGroup);
+    $("knowledge-canvas-layout").addEventListener("click",autoArrange);
+    $("knowledge-canvas-zoom-in").addEventListener("click",()=>setZoom(canvas.zoom*1.2));
+    $("knowledge-canvas-zoom-out").addEventListener("click",()=>setZoom(canvas.zoom/1.2));
+    $("knowledge-canvas-zoom-reset").addEventListener("click",()=>setZoom(1));
+    $("knowledge-canvas-zoom-fit").addEventListener("click",fitBoard);
+    const scroller=viewport();
+    scroller.addEventListener("scroll",renderMinimap,{passive:true});
+    scroller.addEventListener("wheel",e=>{
+      if(!e.ctrlKey)return;
+      e.preventDefault();
+      setZoom(canvas.zoom*(e.deltaY<0?1.1:1/1.1));
+    },{passive:false});
+    scroller.addEventListener("keydown",e=>{
+      if(e.key==="Home"){e.preventDefault();scroller.scrollLeft=0;scroller.scrollTop=0;renderMinimap();}
+      if(e.key==="f"||e.key==="F"){e.preventDefault();fitBoard();}
+      if(e.key==="+"||e.key==="="){e.preventDefault();setZoom(canvas.zoom*1.2);}
+      if(e.key==="-"){e.preventDefault();setZoom(canvas.zoom/1.2);}
+    });
+    scroller.addEventListener("pointerdown",e=>{
+      if(e.button!==1)return;
+      e.preventDefault();
+      const pointer=e.pointerId,startX=e.clientX,startY=e.clientY,
+        left=scroller.scrollLeft,top=scroller.scrollTop;
+      scroller.setPointerCapture(pointer);
+      const move=event=>{
+        if(event.pointerId!==pointer)return;
+        scroller.scrollLeft=left-(event.clientX-startX);
+        scroller.scrollTop=top-(event.clientY-startY);
+        renderMinimap();
+      };
+      const done=event=>{
+        if(event.pointerId!==pointer)return;
+        scroller.removeEventListener("pointermove",move);
+        scroller.removeEventListener("pointerup",done);
+        scroller.removeEventListener("pointercancel",done);
+        if(scroller.hasPointerCapture(pointer))scroller.releasePointerCapture(pointer);
+      };
+      scroller.addEventListener("pointermove",move);
+      scroller.addEventListener("pointerup",done);
+      scroller.addEventListener("pointercancel",done);
+    });
+    $("knowledge-canvas-minimap").addEventListener("click",e=>{
+      const map=e.currentTarget,rect=map.getBoundingClientRect();
+      if(!rect.width||!rect.height)return;
+      const x=layout.clamp((e.clientX-rect.left)/rect.width,0,1)*layout.WIDTH;
+      const y=layout.clamp((e.clientY-rect.top)/rect.height,0,1)*layout.HEIGHT;
+      panTo(x,y);scroller.focus();
+    });
+    window.addEventListener("resize",renderMinimap);
+
     $("knowledge-canvas-select").addEventListener("change", e => {
       const selected = e.target.value; void loadBoard(selected).catch(err => canvasStatus(err.message));
     });
@@ -619,11 +861,6 @@
         element.addEventListener("click", () => show(element.dataset.knowledgeMode));
     }
   }
-  async function savePending() {
-    await canvasSave();
-    if (canvas.board && canvas.dirty > canvas.saved) {
-      throw new Error("Изменения Canvas не сохранены. Операция отменена.");
-    }
-  }
+  async function savePending() { await flushCanvas(); }
   window.AmayurenaKnowledgeAdvanced = { init, show, update, renderHistory, savePending };
 })();
