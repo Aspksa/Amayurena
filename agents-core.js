@@ -53,6 +53,7 @@
       instructions,
       model,
       enabledTools: [...enabledTools],
+      enabled: input.enabled !== false,
       createdAt: opts.createdAt || now,
       updatedAt: now
     };
