@@ -36,6 +36,8 @@ function safePath(name){
    name.startsWith("/")||name.includes("//")||name.includes(":")||
    name.split("/").some(s=>s==="."||s===".."||s.startsWith(".")||s.endsWith(".")||s.endsWith(" ")))
    throw problem("Недопустимое имя файла в ZIP.");
+ if(name.split("/").some(part=>/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)))
+   throw problem("Архив содержит зарезервированное имя Windows.");
  const allowedRoot=/^[a-zA-Z0-9_-]+\.(js|css|bat|md|json|svg)$/i.test(name);
  const allowedAssets=/^assets\/avatars\/[a-zA-Z0-9_-]+\.(webp|avif|svg|png)$/i.test(name);
  if(!allowedRoot&&!allowedAssets)throw problem("Архив содержит недопустимый файл: "+name);
@@ -87,6 +89,8 @@ function unpack(buffer){
    seen.add(fold);
    if(local+30>buffer.length||buffer.readUInt32LE(local)!==0x04034b50)throw problem("Нет заголовка файла ZIP.");
    const lName=buffer.readUInt16LE(local+26),lExtra=buffer.readUInt16LE(local+28);
+   const localName=buffer.subarray(local+30,local+30+lName).toString("utf8");
+   if(localName!==filename)throw problem("Имена в заголовках ZIP не совпадают.");
    const dataOffset=local+30+lName+lExtra;
    if(dataOffset+compressed>buffer.length)throw problem("ZIP повреждён.");
    const packed=buffer.subarray(dataOffset,dataOffset+compressed);
