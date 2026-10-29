@@ -133,6 +133,7 @@
     $("knowledge-canvas-undo").disabled=!canvas.history?.canUndo();
     $("knowledge-canvas-redo").disabled=!canvas.history?.canRedo();
     $("knowledge-canvas-copy").disabled=!canvas.board || !canvas.selected.size;
+    $("knowledge-canvas-delete-selected").disabled=!canvas.board || !canvas.selected.size;
   }
   function undoCanvas(){
     if(!canvas.board||canvas.transitioning)return;
@@ -150,6 +151,18 @@
     if(!canvas.board)return;
     canvas.selected=new Set(canvas.board.nodes.map(n=>n.id));
     renderCanvas();
+  }
+  function deleteSelectedCanvas(){
+    if(!canvas.board||canvas.transitioning||!canvas.selected.size)return;
+    const count=canvas.selected.size;
+    if(!confirm("Удалить выбранные карточки ("+count+") и связанные с ними линии?"))return;
+    const ids=new Set(canvas.selected);
+    canvas.board.nodes=canvas.board.nodes.filter(n=>!ids.has(n.id));
+    canvas.board.edges=canvas.board.edges.filter(e=>!ids.has(e.from)&&!ids.has(e.to));
+    canvas.selected=new Set();
+    canvasChanged();
+    renderCanvas();
+    canvasStatus("Удалено карточек: "+count+". Отменить можно кнопкой «Отменить».");
   }
   function copyCanvas(){
     if(!canvas.board||canvas.transitioning)return;
@@ -277,12 +290,24 @@
       const pointer=event.pointerId,sx=event.clientX,sy=event.clientY;
       const x=record.x,y=record.y;
       const members=movingGroup ? canvas.board.nodes.filter(n=>n.groupId===record.id).map(n=>({node:n,x:n.x,y:n.y})) : [];
+      const selectedPositions=!movingGroup&&canvas.selected.has(record.id)&&canvas.selected.size>1 ?
+        canvas.board.nodes.filter(n=>canvas.selected.has(n.id)).map(n=>({id:n.id,x:n.x,y:n.y})):[];
       let moved=false;
       canvas.dragging=true;
       handle.setPointerCapture(pointer);
       const motion=e=>{
         if (e.pointerId!==pointer) return;
         const dx=Math.round((e.clientX-sx)/canvas.zoom),dy=Math.round((e.clientY-sy)/canvas.zoom);
+        if(selectedPositions.length){
+          const movedGroup=canvasExtra.moveSelection(selectedPositions,record.id,dx,dy,canvas.grid?25:0);
+          if(record.x===x+movedGroup.dx&&record.y===y+movedGroup.dy)return;
+          const positions=new Map(movedGroup.items.map(item=>[item.id,item]));
+          for(const node of canvas.board.nodes){
+            const next=positions.get(node.id);
+            if(next){node.x=next.x;node.y=next.y;}
+          }
+          moved=true;renderPositions();drawEdges();renderMinimap();return;
+        }
         const nx=layout.clamp(x+dx,0,movingGroup?layout.WIDTH-record.width:3200);
         const ny=layout.clamp(y+dy,0,movingGroup?layout.HEIGHT-record.height:2400);
         if (nx===record.x && ny===record.y) return;
@@ -960,6 +985,7 @@
     $("knowledge-canvas-redo").addEventListener("click",redoCanvas);
     $("knowledge-canvas-select-all").addEventListener("click",selectAllCanvas);
     $("knowledge-canvas-copy").addEventListener("click",copyCanvas);
+    $("knowledge-canvas-delete-selected").addEventListener("click",deleteSelectedCanvas);
     $("knowledge-canvas-snap").addEventListener("click",()=>{
       canvas.grid=!canvas.grid;
       $("knowledge-canvas-snap").textContent=canvas.grid?"Сетка: вкл.":"Сетка: выкл.";
@@ -983,6 +1009,17 @@
       setZoom(canvas.zoom*(e.deltaY<0?1.1:1/1.1));
     },{passive:false});
     scroller.addEventListener("keydown",e=>{
+      const tag=(e.target?.tagName||"").toUpperCase();
+      if(["INPUT","TEXTAREA","SELECT"].includes(tag)||e.target?.isContentEditable)return;
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){
+        e.preventDefault();if(e.shiftKey)redoCanvas();else undoCanvas();return;
+      }
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){
+        e.preventDefault();redoCanvas();return;
+      }
+      if(e.key==="Delete"||e.key==="Backspace"){
+        e.preventDefault();deleteSelectedCanvas();return;
+      }
       if(e.key==="Home"){e.preventDefault();scroller.scrollLeft=0;scroller.scrollTop=0;renderMinimap();}
       if(e.key==="f"||e.key==="F"){e.preventDefault();fitBoard();}
       if(e.key==="+"||e.key==="="){e.preventDefault();setZoom(canvas.zoom*1.2);}
