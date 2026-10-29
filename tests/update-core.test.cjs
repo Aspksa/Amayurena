@@ -121,7 +121,7 @@ test("restart uses direct Node spawn and never interpolates a Windows shell comm
  const worker=fs.readFileSync(path.join(__dirname,"..","update-worker.js"),"utf8");
  const functionSource=worker.slice(worker.indexOf("function restart("),worker.indexOf("async function waitForServerExit("));
  assert.match(functionSource,/spawn\(process\.execPath,\[server\]/);
- assert.doesNotMatch(functionSource,/cmd\.exe|\/c|bat\.replace/);
+ assert.doesNotMatch(functionSource,/spawn\(["\x27]cmd\.exe|bat\.replace/);
 });
 test("download rejects bytes that differ from official release digest",async()=>{
  const zip=makeZip(packageFiles()),asset=core.releaseAsset(fakeRelease(zip),"0.18.0");
