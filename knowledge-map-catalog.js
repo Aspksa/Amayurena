@@ -51,6 +51,61 @@ function view(root,{folder="",q="",page=0,size=120}={}){
   note:"Это обзор всех заметок с постраничной отрисовкой, а не одновременный рендер всех узлов."
  };
 }
+function neighbors(root,requestPath,{limit=120}={}){
+ if(!Number.isInteger(limit)||limit<2||limit>240)throw knowledge.problem("Недопустимый предел просмотра.");
+ const path=knowledge.normalizePath(requestPath);
+ const notes=knowledge.list(root).notes;
+ const anchor=notes.find(n=>n.path===path);
+ if(!anchor)throw knowledge.problem("Заметка для карты не найдена.",404);
+ const byPath=new Map(notes.map(n=>[n.path.toLocaleLowerCase("ru"),n]));
+ const byTitle=new Map();
+ for(const n of notes){
+   const key=n.title.toLocaleLowerCase("ru");
+   if(!byTitle.has(key))byTitle.set(key,[]);
+   byTitle.get(key).push(n);
+ }
+ const resolve=(raw,from)=>{
+   const key=raw.trim().replace(/\.md$/i,"").toLocaleLowerCase("ru");
+   const pref=from.folder?from.folder+"/":"";
+   const exact=byPath.get(pref+key+".md")||byPath.get(key+".md");
+   if(exact)return exact;
+   const titles=byTitle.get(key)||[];
+   return titles.length===1?titles[0]:null;
+ };
+ const related=new Map([[path,{note:anchor,incoming:0,outgoing:0}]]);
+ const edges=[],known=new Set();
+ for(const note of notes){
+   if(note.path!==path && !note.links?.length)continue;
+   for(const raw of note.links||[]){
+     const target=resolve(raw,note);
+     if(!target || (note.path!==path && target.path!==path))continue;
+     if(note.path===target.path)continue;
+     const key=note.path+"\u0000"+target.path;
+     if(known.has(key))continue;
+     known.add(key);
+     edges.push({from:note.path,to:target.path,kind:"wiki",provenance:{
+       source:note.path,reference:"[["+raw+"]]"}});
+     const other=note.path===path?target:note;
+     if(!related.has(other.path))related.set(other.path,{note:other,incoming:0,outgoing:0});
+     const data=related.get(other.path);
+     if(note.path===path)data.outgoing++;
+     else data.incoming++;
+   }
+ }
+ const entries=[...related.values()].filter(x=>x.note.path!==path);
+ entries.sort((a,b)=>(b.incoming+b.outgoing)-(a.incoming+a.outgoing)||
+   a.note.path.localeCompare(b.note.path,"ru"));
+ const shown=[anchor,...entries.slice(0,limit-1).map(x=>x.note)];
+ const shownKeys=new Set(shown.map(n=>n.path));
+ return {
+   focus:path,total:related.size,page:0,size:limit,pages:1,mode:"neighbors",
+   nodes:shown.map(n=>({path:n.path,title:n.title,folder:n.folder,updatedAt:n.updatedAt})),
+   links:edges.filter(e=>shownKeys.has(e.from)&&shownKeys.has(e.to)),
+   counts:{incoming:edges.filter(e=>e.to===path).length,outgoing:edges.filter(e=>e.from===path).length},
+   truncated:related.size>limit,
+   clusters:[],note:"Прямые входящие и исходящие wiki-ссылки. Неоднозначные названия не считаются подтверждёнными связями."
+ };
+}
 function timeline(notesRoot,historyRoot,path){
  path=knowledge.normalizePath(path);
  const current=knowledge.read(notesRoot,path);
@@ -70,4 +125,4 @@ function timeline(notesRoot,historyRoot,path){
  return {path,events,observed:snapshots.length,
   note:"Восстановлено из сохранённых версий Markdown; связи Canvas и изменения между незафиксированными версиями не учитываются."};
 }
-module.exports={view,timeline,normalizeFolder};
+module.exports={view,neighbors,timeline,normalizeFolder};
