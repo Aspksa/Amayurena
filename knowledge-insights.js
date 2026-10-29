@@ -1,7 +1,7 @@
 (function(){
   "use strict";
   const $=id=>document.getElementById(id);
-  const state={data:null,catalog:null,page:0,folder:"",selected:"",request:0,catalogRequest:0,timelineRequest:0};
+  const state={data:null,catalog:null,neighborhood:false,page:0,folder:"",selected:"",request:0,catalogRequest:0,timelineRequest:0};
   const svgNS="http://www.w3.org/2000/svg";
   const node=(tag,cls,text)=>{
     const el=document.createElement(tag);
@@ -100,6 +100,25 @@
     }catch(e){if(token===state.timelineRequest)target.replaceChildren(
       node("p","knowledge-insights-small","История недоступна: "+e.message));}
   }
+  async function loadNeighbors(path){
+    if(!path){status("Выберите заметку на карте.",true);return;}
+    const token=++state.catalogRequest;
+    status("Ищу входящие и исходящие wiki-ссылки по всем заметкам…");
+    try{
+      const graph=await fetchJson("/api/knowledge/map/neighbors?path="+encodeURIComponent(path)+"&limit=120");
+      if(token!==state.catalogRequest)return;
+      state.catalog=graph;
+      state.neighborhood=true;
+      state.selected=path;
+      $("knowledge-map-folder").disabled=true;
+      $("knowledge-map-prev").disabled=true;
+      $("knowledge-map-next").disabled=true;
+      $("knowledge-map-back").hidden=false;
+      $("knowledge-map-page").textContent="Окружение заметки";
+      $("knowledge-map-count").textContent=graph.counts.incoming+" входящих · "+graph.counts.outgoing+" исходящих";
+      renderMap();noteDetails(path);
+    }catch(e){if(token===state.catalogRequest)status("Связи недоступны: "+e.message,true);}
+  }
   async function loadCatalog(){
     const token=++state.catalogRequest;
     const params=new URLSearchParams({
@@ -110,6 +129,9 @@
       const catalog=await fetchJson("/api/knowledge/map/catalog?"+params.toString());
       if(token!==state.catalogRequest)return;
       state.catalog=catalog;
+      state.neighborhood=false;
+      $("knowledge-map-folder").disabled=false;
+      $("knowledge-map-back").hidden=true;
       const picker=$("knowledge-map-folder"),selected=state.folder;
       picker.replaceChildren();
       const first=node("option","","Все папки");first.value="";picker.append(first);
@@ -132,16 +154,19 @@
     const data=state.data,root=$("knowledge-insights-graph");
     root.replaceChildren();
     if(!data)return;
-    const query=$("knowledge-insights-search").value.trim().toLocaleLowerCase("ru");
+    const query=state.neighborhood?"":$("knowledge-insights-search").value.trim().toLocaleLowerCase("ru");
     const kind=$("knowledge-insights-filter").value;
     const all=(state.catalog?.nodes||data.nodes).filter(n=>!query||
       (n.path+" "+(n.tags||[]).join(" ")).toLocaleLowerCase("ru").includes(query));
     const shown=all.slice(0,240);
     const ids=new Set(shown.map(n=>n.path));
     const cx=480,cy=310,rx=385,ry=235,coords=new Map();
-    shown.forEach((n,i)=>{
-      const angle=2*Math.PI*i/Math.max(1,shown.length)-Math.PI/2;
-      const layer=shown.length===1?0:.45+.5*(i%3)/2;
+    const center=state.neighborhood?state.catalog?.focus:null;
+    const satellites=center?shown.filter(n=>n.path!==center):shown;
+    if(center)coords.set(center,{x:cx,y:cy});
+    satellites.forEach((n,i)=>{
+      const angle=2*Math.PI*i/Math.max(1,satellites.length)-Math.PI/2;
+      const layer=center?0.82:(shown.length===1?0:.45+.5*(i%3)/2);
       coords.set(n.path,{x:cx+Math.cos(angle)*rx*layer,y:cy+Math.sin(angle)*ry*layer});
     });
     const lines=[...data.links.filter(l=>kind==="all"||l.kind===kind),
@@ -174,9 +199,16 @@
       const t=svg("text",{x:480,y:310,"text-anchor":"middle","font-size":16,fill:"#927f68"},root);
       t.textContent="Нет заметок для отображения";
     }
-    status("Анализировано: "+data.counts.analyzed+" из "+data.counts.total+
-      " заметок. На схеме показано "+shown.length+(all.length>shown.length?" из "+all.length:"")+
-      ". "+data.method+(data.truncated?" Анализ ограничен первыми 180 заметками.":""));
+    if(state.neighborhood){
+      status("Прямые wiki-ссылки: "+state.catalog.counts.incoming+" входящих, "+
+        state.catalog.counts.outgoing+" исходящих. Показано "+shown.length+
+        " из "+state.catalog.total+" связанных заметок."+
+        (state.catalog.truncated?" Часть окружения скрыта лимитом 120 узлов.":""));
+    }else{
+      status("Анализировано: "+data.counts.analyzed+" из "+data.counts.total+
+        " заметок. На схеме показано "+shown.length+(all.length>shown.length?" из "+all.length:"")+
+        ". "+data.method+(data.truncated?" Анализ сходства ограничен первыми 180 заметками.":""));
+    }
   }
   async function confirmSuggestion(s,button){
     if(!confirm("Добавить wiki-ссылку из «"+s.from+"» в «"+s.to+
@@ -260,6 +292,8 @@
   $("knowledge-map-next").addEventListener("click",()=>{
     if(state.catalog && state.page+1<state.catalog.pages){state.page++;void loadCatalog();}
   });
+  $("knowledge-map-neighbors").addEventListener("click",()=>{void loadNeighbors(state.selected);});
+  $("knowledge-map-back").addEventListener("click",()=>{void loadCatalog();});
   $("knowledge-insights-filter").addEventListener("change",renderMap);
   window.AmayurenaInsights={load};
 })();
