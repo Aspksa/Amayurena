@@ -591,7 +591,11 @@
       group: $("knowledge-bases-group").value,
       filterField: $("knowledge-bases-property").value || "title",
       filterValue: $("knowledge-bases-value").value,
-      filterOp: $("knowledge-bases-filter-op").value
+      filterOp: $("knowledge-bases-filter-op").value,
+      filterField2: $("knowledge-bases-property2").value,
+      filterValue2: $("knowledge-bases-property2").value ? $("knowledge-bases-value2").value : "",
+      filterOp2: $("knowledge-bases-filter-op2").value,
+      filterJoin: $("knowledge-bases-filter-join").value
     };
   }
   function applyView(view) {
@@ -602,6 +606,10 @@
     $("knowledge-bases-property").value = view.filterField;
     $("knowledge-bases-value").value = view.filterValue;
     $("knowledge-bases-filter-op").value = view.filterOp || "contains";
+    $("knowledge-bases-property2").value = view.filterField2 || "";
+    $("knowledge-bases-value2").value = view.filterValue2 || "";
+    $("knowledge-bases-filter-op2").value = view.filterOp2 || "contains";
+    $("knowledge-bases-filter-join").value = view.filterJoin || "and";
     renderBases();
   }
   function renderViewSelect() {
@@ -639,6 +647,7 @@
       basesState.formulas = settings.formulas || {};
       basesState.sha = settings.sha;
       fillOptions("knowledge-bases-property",config.columns);
+      fillOptions("knowledge-bases-property2",config.columns,"Без второго условия");
       fillOptions("knowledge-bases-sort",config.columns);
       fillOptions("knowledge-bases-group",config.columns,"Без группировки");
       const dateFields=Object.keys(basesState.types).filter(key=>basesState.types[key]==="date");
@@ -668,6 +677,7 @@
       try{
         await storeSettings();
         fillOptions("knowledge-bases-property",config.columns);
+      fillOptions("knowledge-bases-property2",config.columns,"Без второго условия");
         fillOptions("knowledge-bases-sort",config.columns);
         fillOptions("knowledge-bases-group",config.columns,"Без группировки");
         $("knowledge-bases-formula-name").value="";
@@ -695,6 +705,7 @@
     try {
       await storeSettings();
       fillOptions("knowledge-bases-property",config.columns);
+      fillOptions("knowledge-bases-property2",config.columns,"Без второго условия");
       fillOptions("knowledge-bases-sort",config.columns);
       fillOptions("knowledge-bases-group",config.columns,"Без группировки");
       input.value="";
@@ -866,7 +877,7 @@
     const state=formView();
     const rows=config.rows.filter(row=>{
       const matches=(row.path+" "+Object.values(row.properties).join(" ")).toLocaleLowerCase("ru").includes(phrase);
-      const filter=basesMath.match(cellValue(row,state.filterField),state.filterValue,state.filterOp);
+      const filter=basesMath.matchFilters(field=>cellValue(row,field),state);
       return matches && filter;
     }).sort((a,b)=> {
       const key=state.sort;
@@ -1063,6 +1074,9 @@
     $("knowledge-bases-search").addEventListener("input", renderBases);
     $("knowledge-bases-property").addEventListener("change", renderBases);
     $("knowledge-bases-value").addEventListener("input", renderBases);
+    $("knowledge-bases-value2").addEventListener("input", renderBases);
+    for(const id of ["knowledge-bases-property2","knowledge-bases-filter-op2","knowledge-bases-filter-join"])
+      $(id).addEventListener("change",renderBases);
 
     for (const id of ["knowledge-bases-sort","knowledge-bases-direction",
       "knowledge-bases-group","knowledge-bases-layout"]) {
