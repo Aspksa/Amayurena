@@ -16,6 +16,19 @@ function fixture(run){
 }
 function note(root,path,body){return vault.create(root,path,body);}
 
+test("rapid consecutive note saves retain chronological snapshot order",()=>fixture(s=>{
+ const advanced=require("../knowledge-advanced-core");
+ note(s.notes,"Rapid.md","# Исходная");
+ for(let i=0;i<12;i++)advanced.saveNote(s.notes,path.join(s.base,"history"),"Rapid.md","# Версия "+i);
+ const ordered=advanced.history(path.join(s.base,"history"),"Rapid.md").reverse();
+ assert.equal(ordered.length,12);
+ const contents=ordered.map(record=>advanced.readVersion(path.join(s.base,"history"),"Rapid.md",record.id).content);
+ assert.deepEqual(contents,["# Исходная",...Array.from({length:11},(_,i)=>"# Версия "+i)]);
+ const ids=ordered.map(x=>x.id);
+ assert.deepEqual(ids,[...ids].sort());
+ const timeline=map.timeline(s.notes,path.join(s.base,"history"),"Rapid.md");
+ assert.equal(timeline.observed,13);
+}));
 test("multi-card translation preserves relative offsets and supports grid",()=>{
  const originals=[{id:"a",x:50,y:100},{id:"b",x:300,y:200}];
  const result=canvas.moveSelection(originals,"a",26,-20,25);
