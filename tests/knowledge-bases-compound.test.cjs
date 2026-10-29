@@ -57,7 +57,8 @@ test("malformed second filters are rejected by server validation",()=>{
    {filterField2:"unknown",filterValue2:"1",filterOp2:"exec"},
    {filterField2:"priority",filterValue2:"1",filterJoin:"eval"},
    {filterField2:"priority",filterValue2:"x".repeat(121)},
-   {filterField2:"",filterValue2:"abc"}
+   {filterField2:"",filterValue2:"abc"},
+   {filterField2:"constructor",filterValue2:"5"}
  ]){
    assert.throws(()=>bases.validateSettings({...settings,views:[{...oldView,...bad}]}),{status:400});
  }
