@@ -136,7 +136,7 @@ function validateSettings(data) {
         (view.filterValue2 && !view.filterField2))
       throw problem("Неверный сохранённый вид.");
     for (const name of [view.sort,view.group,view.filterField,view.filterField2||""])
-      if (name && !RESERVED.has(name)) safeField(name);
+      if (name && !["title","folder","updatedAt"].includes(name)) safeField(name);
     ids.add(view.id);
     views.push({id:view.id,name:view.name.trim(),layout:view.layout,sort:view.sort,
       direction:view.direction,group:view.group,filterField:view.filterField,filterValue:view.filterValue,
