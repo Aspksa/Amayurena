@@ -59,8 +59,6 @@ test("malformed second filters are rejected by server validation",()=>{
    {filterField2:"priority",filterValue2:"x".repeat(121)},
    {filterField2:"",filterValue2:"abc"}
  ]){
-   // The blank-field case is valid in the legacy schema; it must be an error when a nonempty second value is set.
-   if(bad.filterField2==="" && bad.filterValue2==="abc") continue;
    assert.throws(()=>bases.validateSettings({...settings,views:[{...oldView,...bad}]}),{status:400});
  }
 });
