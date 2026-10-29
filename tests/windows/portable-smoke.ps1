@@ -39,7 +39,7 @@ try {
   $noteName = "Проверка Windows.md"
   $body = @{ path = $noteName; content = ("# Проверка Windows" + [Environment]::NewLine + "Сохранение из Unicode & portable.") } | ConvertTo-Json -Compress
   $bytes = [Text.Encoding]::UTF8.GetBytes($body)
-  $created = Invoke-RestMethod -Uri "$base/api/knowledge/note/create" -Method Post -ContentType "application/json; charset=utf-8" -Body $bytes
+  $created = Invoke-RestMethod -Uri "$base/api/knowledge/note/create" -Method Post -ContentType "application/json" -Body $bytes
   $encoded = [Uri]::EscapeDataString($noteName)
   $note = Invoke-RestMethod -Uri "$base/api/knowledge/note?path=$encoded"
   if ($note.content -notmatch "Unicode & portable") { throw "Unicode knowledge save/read failed." }
