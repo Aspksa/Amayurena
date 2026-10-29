@@ -86,5 +86,20 @@ function match(value,query,operator="contains"){
  }
  throw Error("Недопустимое сравнение.");
 }
-return {evaluate,tokenize,aggregate,match,validateField};
+function matchFilters(valueForField,config){
+ if(typeof valueForField!=="function"||!config||typeof config!=="object")
+   throw Error("Недопустимые условия фильтра.");
+ const join=config.filterJoin||"and";
+ if(!["and","or"].includes(join))throw Error("Неизвестная логика фильтра.");
+ const rules=[
+   {field:config.filterField,value:config.filterValue,op:config.filterOp||"contains"},
+   {field:config.filterField2,value:config.filterValue2,op:config.filterOp2||"contains"}
+ ].filter(rule=>typeof rule.value==="string"&&rule.value.trim().length>0);
+ if(rules.some(rule=>typeof rule.field!=="string"||!rule.field))
+   throw Error("Фильтр не содержит имени поля.");
+ if(!rules.length)return true;
+ const values=rules.map(rule=>match(valueForField(rule.field),rule.value,rule.op));
+ return join==="or"?values.some(Boolean):values.every(Boolean);
+}
+return {evaluate,tokenize,aggregate,match,matchFilters,validateField};
 });
