@@ -3,66 +3,23 @@ on:
   push:
     branches: [main]
   pull_request:
+
 permissions:
   contents: read
+
 jobs:
   agent-catalog:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
-      - name: Validate JavaScript syntax
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate all JavaScript syntax
         run: |
-          node --check knowledge-bases-core.js
-          node --check tests/knowledge-bases.test.cjs
-          node --check tests/knowledge-bases-compound.test.cjs
-          node --check knowledge-canvas-enhance.js
-          node --check knowledge-bases-calendar.js
-          node --check tests/knowledge-bases-calendar.test.cjs
-          node --check knowledge-bases-math.js
-          node --check knowledge-map-catalog.js
-          node --check tests/knowledge-next.test.cjs
-          node --check tests/knowledge-graph-neighbors.test.cjs
-          node --check knowledge-canvas-layout.js
-          node --check tests/knowledge-canvas-13.test.cjs
-          node --check tests/knowledge-canvas-navigation.test.cjs
-          node --check knowledge-advanced-core.js
-          node --check knowledge-advanced.js
-          node --check knowledge-markdown.js
-          node --check tests/knowledge-advanced.test.cjs
-          node --check tests/knowledge-markdown.test.cjs
-          node --check knowledge-document-outline.js
-          node --check tests/knowledge-document-outline.test.cjs
-          node --check knowledge-editor-tools.js
-          node --check tests/knowledge-editor-tools.test.cjs
-          node --check tests/knowledge-editor-navigation.test.cjs
-          node --check knowledge-native.js
-          node --check tests/knowledge-native.test.cjs
-          node --check knowledge-attachments.js
-          node --check tests/knowledge-attachments.test.cjs
-          node --check knowledge-maintenance.js
-          node --check tests/knowledge-maintenance.test.cjs
-          node --check knowledge-insights-core.js
-          node --check knowledge-insights.js
-          node --check tests/knowledge-insights.test.cjs
-          node --check knowledge-core.js
-          node --check knowledge.js
-          node --check tests/knowledge.test.cjs
-          node --check chat-sessions.js
-          node --check tests/chat-sessions.test.cjs
-          node --check agents-core.js
-          node --check app.js
-          node --check workspace.js
-          node --check avatar.js
-          node --check avatar-assets.js
-          node --check avatar-package.js
-          node --check avatar-publisher.js
-          node --check server.js
-          node --check update-core.js
-          node --check update-worker.js
-          node --check update-ui.js
-          node --check tests/update-core.test.cjs
-          node --check server-core.js
-          node --check tests/agents.test.cjs
-      - name: Run agent model tests
+          for file in *.js tests/*.test.cjs tests/e2e/*.cjs scripts/*.cjs; do
+            node --check "$file"
+          done
+      - name: Run all Node regression tests
         run: node --test tests/*.test.cjs
