@@ -199,3 +199,21 @@
   outline:2px solid #b98b49;outline-offset:2px;
 }
 .knowledge-canvas-node.selected{outline:3px solid #b88737;outline-offset:2px}
+
+
+/* Bases: optional second comparison and AND/OR logic */
+.knowledge-bases-compound {
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+  padding:9px 11px;border:1px solid #e8ddca;border-radius:11px;
+  background:#fffcf7;
+}
+.knowledge-bases-compound label {font-size:11px;font-weight:600;color:#81694d}
+.knowledge-bases-compound select,.knowledge-bases-compound input {
+  max-width:220px;min-width:85px;padding:9px;
+  border:1px solid #d9caaf;border-radius:8px;background:#fff;color:#65533b;
+}
+.knowledge-bases-compound input {flex:1 1 140px}
+@media(max-width:740px){
+  .knowledge-bases-compound{width:100%}
+  .knowledge-bases-compound input{max-width:100%}
+}
