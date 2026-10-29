@@ -1,0 +1,59 @@
+name: Full QA (browser and Windows)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'styles.css'
+      - 'workspace.css'
+      - 'knowledge*.css'
+      - '*.js'
+      - '*.bat'
+      - 'tests/e2e/**'
+      - 'tests/windows/**'
+      - 'scripts/**'
+      - '.github/workflows/full-qa.yml'
+      - '.github/workflows/publish-release.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Chromium dependency
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Browser E2E (knowledge, Canvas, Bases, agents, chat)
+        run: node tests/e2e/browser-smoke.cjs
+      - name: Upload screenshot on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-debug
+          path: /tmp/amayurena-smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 5
+
+  windows-portable:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test update, backup, recovery and Windows paths
+        run: node --test tests/update-core.test.cjs
+      - name: Windows portable folder and localhost API
+        shell: pwsh
+        run: ./tests/windows/portable-smoke.ps1
