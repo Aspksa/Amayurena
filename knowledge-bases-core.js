@@ -128,12 +128,20 @@ function validateSettings(data) {
         typeof view.group!=="string" || view.group.length>40 ||
         typeof view.filterField!=="string" || view.filterField.length>40 ||
         typeof view.filterValue!=="string" || view.filterValue.length>120 ||
-        (view.filterOp!==undefined && !["contains","eq","neq","gt","gte","lt","lte"].includes(view.filterOp))) throw problem("Неверный сохранённый вид.");
-    for (const name of [view.sort,view.group,view.filterField]) if (name && !RESERVED.has(name)) safeField(name);
+        (view.filterOp!==undefined && !["contains","eq","neq","gt","gte","lt","lte"].includes(view.filterOp)) ||
+        (view.filterField2!==undefined && (typeof view.filterField2!=="string" || view.filterField2.length>40)) ||
+        (view.filterValue2!==undefined && (typeof view.filterValue2!=="string" || view.filterValue2.length>120)) ||
+        (view.filterOp2!==undefined && !["contains","eq","neq","gt","gte","lt","lte"].includes(view.filterOp2)) ||
+        (view.filterJoin!==undefined && !["and","or"].includes(view.filterJoin)))
+      throw problem("Неверный сохранённый вид.");
+    for (const name of [view.sort,view.group,view.filterField,view.filterField2||""])
+      if (name && !RESERVED.has(name)) safeField(name);
     ids.add(view.id);
     views.push({id:view.id,name:view.name.trim(),layout:view.layout,sort:view.sort,
       direction:view.direction,group:view.group,filterField:view.filterField,filterValue:view.filterValue,
-      filterOp:view.filterOp||"contains"});
+      filterOp:view.filterOp||"contains",filterField2:view.filterField2||"",
+      filterValue2:view.filterValue2||"",filterOp2:view.filterOp2||"contains",
+      filterJoin:view.filterJoin||"and"});
   }
   return {types,views,formulas};
 }
