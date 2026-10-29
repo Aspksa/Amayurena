@@ -78,9 +78,13 @@ async function update(fetchImpl=fetch,root=ROOT){
 }
 function restart(root=ROOT){
  if(process.platform!=="win32")return false;
- const bat=path.join(root,"Amayurena.bat");
- const cmd='start "" "'+bat.replace(/%/g,"%%")+'"';
- const child=spawn("cmd.exe",["/d","/s","/c",cmd],{detached:true,windowsHide:true,stdio:"ignore",cwd:root});
+ // No cmd.exe or shell interpolation: Cyrillic, spaces, '&' and '%' remain literal path bytes.
+ const server=path.join(root,"server.js");
+ if(!fs.existsSync(server))throw Error("Отсутствует сервер после установки.");
+ const child=spawn(process.execPath,[server],{
+   detached:true,windowsHide:true,stdio:"ignore",cwd:root
+ });
+ if(!child.pid)throw Error("Не удалось перезапустить локальный сервер.");
  child.on("error",()=>{});
  child.unref();
  return true;

@@ -85,6 +85,44 @@ test("interrupted update recovery restores originals and removes new files",()=>
  assert.equal(fs.existsSync(path.join(root,"extra.js")),false);
  assert.equal(core.restore(root).restored,false);
 }));
+test("corrupted backup rejects the whole rollback before touching any installed file",()=>fixture(root=>{
+ const folder=path.join(root,".updates","backups","backup-hashes");
+ fs.mkdirSync(folder,{recursive:true});
+ fs.writeFileSync(path.join(folder,"server.js"),"ORIGINAL SERVER");
+ fs.writeFileSync(path.join(folder,"index.html"),"ORIGINAL HTML");
+ fs.writeFileSync(path.join(root,"server.js"),"UPDATED SERVER");
+ fs.writeFileSync(path.join(root,"index.html"),"UPDATED HTML");
+ const journal=path.join(root,".updates","recovery.json");
+ fs.writeFileSync(journal,JSON.stringify({tag:"v0.18.1",backup:"backup-hashes",files:[
+  {name:"server.js",existed:true,sha256:core.sha(Buffer.from("ORIGINAL SERVER"))},
+  {name:"index.html",existed:true,sha256:core.sha(Buffer.from("EXPECTED DIFFERENT CONTENT"))}
+ ]}));
+ assert.throws(()=>core.restore(root),/SHA-256/);
+ assert.equal(fs.readFileSync(path.join(root,"server.js"),"utf8"),"UPDATED SERVER");
+ assert.equal(fs.readFileSync(path.join(root,"index.html"),"utf8"),"UPDATED HTML");
+ assert.equal(fs.existsSync(journal),true);
+ fs.writeFileSync(path.join(folder,"index.html"),"EXPECTED DIFFERENT CONTENT");
+ assert.equal(core.restore(root).restored,true);
+ assert.equal(fs.readFileSync(path.join(root,"server.js"),"utf8"),"ORIGINAL SERVER");
+ assert.equal(fs.readFileSync(path.join(root,"index.html"),"utf8"),"EXPECTED DIFFERENT CONTENT");
+}));
+test("rollback refuses path collisions and symbolic links",()=>fixture(root=>{
+ const folder=path.join(root,".updates","backups","backup-links");
+ fs.mkdirSync(folder,{recursive:true});
+ fs.writeFileSync(path.join(folder,"server.js"),"original");
+ const journal=path.join(root,".updates","recovery.json");
+ fs.writeFileSync(journal,JSON.stringify({backup:"backup-links",files:[
+  {name:"server.js",existed:true},{name:"SERVER.js",existed:false}
+ ]}));
+ assert.throws(()=>core.restore(root),/повторяющийся/i);
+ assert.equal(fs.existsSync(journal),true);
+}));
+test("restart uses direct Node spawn and never interpolates a Windows shell command",()=>{
+ const worker=fs.readFileSync(path.join(__dirname,"..","update-worker.js"),"utf8");
+ const functionSource=worker.slice(worker.indexOf("function restart("),worker.indexOf("async function waitForServerExit("));
+ assert.match(functionSource,/spawn\(process\.execPath,\[server\]/);
+ assert.doesNotMatch(functionSource,/spawn\(["\x27]cmd\.exe|bat\.replace/);
+});
 test("download rejects bytes that differ from official release digest",async()=>{
  const zip=makeZip(packageFiles()),asset=core.releaseAsset(fakeRelease(zip),"0.18.0");
  const fake=async()=>({ok:true,status:200,headers:{get:()=>String(zip.length)},
