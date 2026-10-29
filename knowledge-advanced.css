@@ -192,3 +192,10 @@
 .knowledge-bases-calendar-more{font-size:10px;color:#997c4b}
 .knowledge-bases-relation-open{background:transparent;border:0;padding:4px;text-decoration:underline;color:#9470a5;cursor:pointer;font-size:11px}
 @media(max-width:850px){.knowledge-bases-month-grid{overflow-x:auto;min-width:640px}.knowledge-bases-panel{overflow-x:auto}}
+
+/* Large graph navigation and multi-selection */
+#knowledge-map-back[hidden] {display:none!important}
+#knowledge-map-neighbors:focus-visible,#knowledge-map-back:focus-visible {
+  outline:2px solid #b98b49;outline-offset:2px;
+}
+.knowledge-canvas-node.selected{outline:3px solid #b88737;outline-offset:2px}
