@@ -60,7 +60,7 @@ function build(filename,root=ROOT) {
   if(fs.existsSync(absolute))fs.unlinkSync(absolute);
   execFileSync("zip",["-q","-X","-9",absolute,...files],{cwd:root,timeout:120000});
   const result=inspectZip(absolute,root);
-  fs.writeFileSync(absolute+".sha256",result.sha256+"  "+path.basename(absolute)+"\n");
+  fs.writeFileSync(absolute+".sha256",result.sha256+"  "+path.relative(process.cwd(),absolute).replace(/\\/g,"/")+"\n");
   return result;
 }
 if(require.main===module){
