@@ -417,6 +417,21 @@
                 <option value="gte">Не меньше</option><option value="lt">Меньше</option>
                 <option value="lte">Не больше</option>
               </select>
+              <div class="knowledge-bases-compound" role="group" aria-label="Дополнительное условие фильтра">
+                <label for="knowledge-bases-filter-join">Логика:</label>
+                <select id="knowledge-bases-filter-join"><option value="and">И</option><option value="or">ИЛИ</option></select>
+                <label for="knowledge-bases-property2">Второе поле:</label>
+                <select id="knowledge-bases-property2"><option value="">Без второго условия</option></select>
+                <label for="knowledge-bases-filter-op2">Условие:</label>
+                <select id="knowledge-bases-filter-op2">
+                  <option value="contains">Содержит</option><option value="eq">Равно</option>
+                  <option value="neq">Не равно</option><option value="gt">Больше</option>
+                  <option value="gte">Не меньше</option><option value="lt">Меньше</option>
+                  <option value="lte">Не больше</option>
+                </select>
+                <label for="knowledge-bases-value2">Значение:</label>
+                <input id="knowledge-bases-value2" maxlength="120" type="search" placeholder="Дополнительный фильтр…">
+              </div>
               <label for="knowledge-bases-sort">Сортировать:</label>
               <select id="knowledge-bases-sort"></select>
               <label for="knowledge-bases-direction">Порядок:</label>
