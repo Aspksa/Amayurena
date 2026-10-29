@@ -25,7 +25,7 @@ async function main(){
     browser=await chromium.launch({headless:true});
     page=await browser.newPage({viewport:{width:1380,height:850}});
     page.setDefaultTimeout(16000);
-    page.on("pageerror",error=>errors.push(error.message));
+    page.on("pageerror",error=>errors.push(error.stack||error.message));
     await page.goto(origin,{waitUntil:"domcontentloaded"});
     await page.locator("#home-view").waitFor({state:"visible"});
 
