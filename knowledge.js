@@ -2,7 +2,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const ui = {
-    search: $("knowledge-search"), tree: $("knowledge-tree"), empty: $("knowledge-empty"),
+    search: $("knowledge-search"), tree: $("knowledge-tree"),
     path: $("knowledge-path"), editor: $("knowledge-editor"), preview: $("knowledge-preview"),
     backlinks: $("knowledge-backlinks"), graph: $("knowledge-graph"),
     stats: $("knowledge-stats"), status: $("knowledge-status"), panel: $("knowledge-editor-panel"),
