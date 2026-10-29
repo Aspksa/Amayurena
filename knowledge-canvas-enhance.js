@@ -70,5 +70,31 @@ function copySelected(board,selected,newId){
  }
  return {board:target,ids:copies.map(n=>n.id)};
 }
-return {clone,template,timeline,snap,copySelected,MAX_HISTORY};
+function moveSelection(positions,primaryId,dx,dy,gridStep=0){
+ if(!Array.isArray(positions)||!positions.length||positions.length>MAX_NODES||
+    !Number.isFinite(dx)||!Number.isFinite(dy)||
+    (gridStep!==0&&(!Number.isInteger(gridStep)||gridStep<1||gridStep>200)))
+   throw Error("Некорректное перемещение выбранных карточек.");
+ const originals=new Map();
+ for(const item of positions){
+   if(!item||typeof item.id!=="string"||originals.has(item.id)||
+      !Number.isFinite(item.x)||!Number.isFinite(item.y)||
+      item.x<0||item.x>3200||item.y<0||item.y>2400)
+     throw Error("Некорректные исходные координаты.");
+   originals.set(item.id,item);
+ }
+ const primary=originals.get(primaryId);
+ if(!primary)throw Error("Главная карточка отсутствует в выделении.");
+ const xs=positions.map(p=>p.x),ys=positions.map(p=>p.y);
+ const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ let shiftX=Math.max(-minX,Math.min(3200-maxX,Math.round(dx)));
+ let shiftY=Math.max(-minY,Math.min(2400-maxY,Math.round(dy)));
+ if(gridStep){
+   shiftX=Math.max(-minX,Math.min(3200-maxX,snap(primary.x+shiftX,gridStep)-primary.x));
+   shiftY=Math.max(-minY,Math.min(2400-maxY,snap(primary.y+shiftY,gridStep)-primary.y));
+ }
+ return {dx:shiftX,dy:shiftY,
+   items:positions.map(p=>({id:p.id,x:p.x+shiftX,y:p.y+shiftY}))};
+}
+return {clone,template,timeline,snap,copySelected,moveSelection,MAX_HISTORY};
 });
