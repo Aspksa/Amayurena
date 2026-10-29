@@ -123,19 +123,41 @@ function restore(root){
  const journalFile=path.join(root,".updates","recovery.json");
  if(!fs.existsSync(journalFile))return {restored:false};
  const j=JSON.parse(fs.readFileSync(journalFile,"utf8"));
- if(!Array.isArray(j.files)||typeof j.backup!=="string"||!/^backup-[a-z0-9-]+$/.test(j.backup))
+ if(!Array.isArray(j.files)||j.files.length>MAX_FILES||typeof j.backup!=="string"||
+   !/^backup-[a-z0-9-]+$/.test(j.backup))
    throw problem("Повреждён журнал отката. Автоматическое восстановление прекращено.");
  const backup=path.join(root,".updates","backups",j.backup);
- for(const item of j.files){
-   const rel=safePath(item.name),dest=path.join(root,...rel.split("/"));
+ const seen=new Set();
+ // Validate every backup before replacing even one file. Partial recovery is dangerous.
+ const plan=j.files.map(item=>{
+   if(!item||typeof item!=="object"||typeof item.existed!=="boolean")throw problem("Повреждён журнал отката.");
+   const rel=safePath(item.name),fold=rel.toLowerCase();
+   if(seen.has(fold))throw problem("Журнал отката содержит повторяющийся файл.");
+   seen.add(fold);
+   const dest=path.join(root,...rel.split("/"));
+   if(fs.existsSync(dest)){
+     const stat=fs.lstatSync(dest);
+     if(!stat.isFile()||stat.isSymbolicLink())throw problem("Небезопасная цель восстановления: "+rel);
+   }
+   let content=null;
    if(item.existed){
      const backed=path.join(backup,...rel.split("/"));
      if(!fs.existsSync(backed))throw problem("Не найдена резервная копия файла "+rel);
-     atomicReplace(dest,fs.readFileSync(backed));
-   } else if(fs.existsSync(dest))fs.unlinkSync(dest);
+     const stat=fs.lstatSync(backed);
+     if(!stat.isFile()||stat.isSymbolicLink())throw problem("Резервный файл повреждён: "+rel);
+     content=fs.readFileSync(backed);
+     if(item.sha256!==undefined &&
+       (typeof item.sha256!=="string"||!/^[a-f0-9]{64}$/.test(item.sha256)||sha(content)!==item.sha256))
+       throw problem("SHA-256 резервного файла не совпал: "+rel);
+   }
+   return {dest,existed:item.existed,content};
+ });
+ for(const item of plan){
+   if(item.existed)atomicReplace(item.dest,item.content);
+   else if(fs.existsSync(item.dest))fs.unlinkSync(item.dest);
  }
  fs.unlinkSync(journalFile);
- return {restored:true,count:j.files.length};
+ return {restored:true,count:plan.length};
 }
 function install(root,files,tag){
  verifyPackage(files,tag);
@@ -155,9 +177,10 @@ function install(root,files,tag){
      if(!stat.isFile()||stat.isSymbolicLink())throw problem("Недопустимая замена файла: "+rel);
      const save=path.join(folder,...rel.split("/"));
      fs.mkdirSync(path.dirname(save),{recursive:true});
-     fs.copyFileSync(dest,save);
-   }
-   records.push({name:rel,existed});
+     const original=fs.readFileSync(dest);
+     fs.writeFileSync(save,original,{flag:"wx",mode:0o600});
+     records.push({name:rel,existed:true,sha256:sha(original)});
+   }else records.push({name:rel,existed:false});
  }
  writeJson(journalFile,{tag,backup:id,files:records});
  try{
