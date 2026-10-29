@@ -1,32 +1,57 @@
 name: Publish verified portable release
+
 on:
   push:
     tags:
       - 'v[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release version matching project-version.json, e.g. v0.18.0'
+        required: true
+        type: string
+
 permissions:
-  contents: write
+  contents: read
+
 jobs:
-  release:
+  full-qa:
+    uses: ./.github/workflows/full-qa.yml
+
+  publish:
+    needs: full-qa
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Validate release version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm release is HEAD of main and version matches
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
         run: |
-          node -e 'const fs=require("fs"); const current=JSON.parse(fs.readFileSync("project-version.json","utf8")).version; if("v"+current!==process.env.RELEASE_TAG){console.error("Tag and project-version.json differ");process.exit(1)}'
-      - name: Validate JavaScript and test suite
+          git fetch origin main --depth=1
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || (echo "Release source must be the latest main" >&2; exit 1)
+          node -e 'const fs=require("fs");const tag=process.env.RELEASE_TAG;const v=JSON.parse(fs.readFileSync("project-version.json","utf8")).version;if(!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)||tag!=="v"+v)throw Error("Tag and project version differ");'
+      - name: Syntax and full regression suite
         run: |
           for src in *.js; do node --check "$src"; done
           node --test tests/*.test.cjs
-      - name: Assemble code-only release
+      - name: Build and independently verify release archive
         run: |
-          zip -q -r Amayurena-update.zip *.js *.css *.bat *.md *.json *.svg assets/avatars
-          sha256sum Amayurena-update.zip > Amayurena-update.zip.sha256
-      - name: Publish stable release after tests
+          node scripts/release-bundle.cjs dist/Amayurena-update.zip
+          node scripts/release-bundle.cjs --verify dist/Amayurena-update.zip
+          sha256sum --check dist/Amayurena-update.zip.sha256
+      - name: Publish only after all checks and smoke suites
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" Amayurena-update.zip Amayurena-update.zip.sha256 --title "Amayurena $RELEASE_TAG" --notes "Portable verified release for Windows 10/11. Before upgrading, back up your data folder separately."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite published artifacts" >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" dist/Amayurena-update.zip dist/Amayurena-update.zip.sha256 --target "$GITHUB_SHA" --title "Amayurena $RELEASE_TAG" --notes "Verified local Windows release. Full browser and Windows smoke checks passed. User data and keys are not part of the archive."
