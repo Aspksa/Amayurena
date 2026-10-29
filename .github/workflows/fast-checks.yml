@@ -21,6 +21,7 @@ jobs:
           node --check knowledge-bases-math.js
           node --check knowledge-map-catalog.js
           node --check tests/knowledge-next.test.cjs
+          node --check tests/knowledge-graph-neighbors.test.cjs
           node --check knowledge-canvas-layout.js
           node --check tests/knowledge-canvas-13.test.cjs
           node --check tests/knowledge-canvas-navigation.test.cjs

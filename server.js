@@ -274,6 +274,14 @@ function createServer(options = {}) {
         }));
       }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Не удалось прочитать каталог."});}
     }
+    if (pathname === "/api/knowledge/map/neighbors" && req.method === "GET") {
+      try{
+        const q=new URL(req.url,"http://localhost").searchParams;
+        return json(res,200,knowledgeMapCatalog.neighbors(knowledgeRoot,q.get("path"),{
+          limit:q.has("limit")?Number(q.get("limit")):120
+        }));
+      }catch(e){return json(res,e.status||500,{error:e.status?e.message:"Не удалось прочитать соседние заметки."});}
+    }
     if (pathname === "/api/knowledge/map/timeline" && req.method === "GET") {
       try {
         const q=new URL(req.url,"http://localhost").searchParams;

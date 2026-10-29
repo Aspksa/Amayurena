@@ -46,11 +46,16 @@ function history(root, notePath) {
       return { id: name.slice(0, -5), at: record.at, bytes: Buffer.byteLength(record.content, "utf8") };
     }).filter(Boolean);
 }
+let lastSnapshotTimestamp=0;
 function snapshot(root, notePath, content) {
   const folder = noteHistoryFolder(root, notePath);
-  const id = Date.now().toString().padStart(13, "0") + "-" + crypto.randomBytes(6).toString("hex");
+  // File-name sorting is the history order; random suffixes alone cannot order writes
+  // performed in the same millisecond. Use a monotonic timestamp within this process.
+  const timestamp=Math.max(Date.now(),lastSnapshotTimestamp+1);
+  lastSnapshotTimestamp=timestamp;
+  const id = timestamp.toString().padStart(13, "0") + "-" + crypto.randomBytes(6).toString("hex");
   writeAtomic(path.join(folder, id + ".json"), JSON.stringify({
-    path: notePath, at: new Date().toISOString(), content
+    path: notePath, at: new Date(timestamp).toISOString(), content
   }));
   const records = history(root, notePath);
   for (const record of records.slice(MAX_HISTORY)) fs.unlinkSync(path.join(folder, record.id + ".json"));
