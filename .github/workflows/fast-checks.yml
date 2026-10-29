@@ -15,6 +15,7 @@ jobs:
         run: |
           node --check knowledge-bases-core.js
           node --check tests/knowledge-bases.test.cjs
+          node --check tests/knowledge-bases-compound.test.cjs
           node --check knowledge-canvas-enhance.js
           node --check knowledge-bases-calendar.js
           node --check tests/knowledge-bases-calendar.test.cjs
