@@ -132,7 +132,8 @@ function validateSettings(data) {
         (view.filterField2!==undefined && (typeof view.filterField2!=="string" || view.filterField2.length>40)) ||
         (view.filterValue2!==undefined && (typeof view.filterValue2!=="string" || view.filterValue2.length>120)) ||
         (view.filterOp2!==undefined && !["contains","eq","neq","gt","gte","lt","lte"].includes(view.filterOp2)) ||
-        (view.filterJoin!==undefined && !["and","or"].includes(view.filterJoin)))
+        (view.filterJoin!==undefined && !["and","or"].includes(view.filterJoin)) ||
+        (view.filterValue2 && !view.filterField2))
       throw problem("Неверный сохранённый вид.");
     for (const name of [view.sort,view.group,view.filterField,view.filterField2||""])
       if (name && !RESERVED.has(name)) safeField(name);
